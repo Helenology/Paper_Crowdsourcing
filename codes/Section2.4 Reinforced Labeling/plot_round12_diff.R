@@ -20,6 +20,9 @@ plot(data$pi0, data$p2_large_case, type = "l", lty=1,
 lines(data$pi0, data$p2_equal_case, lty = 4)
 lines(data$pi0, data$pi0, lty=2)
 
-legend("bottomright", legend = c("Second-Round 1", "Second-Round 2", "First-Round"),
+legend("bottomright", 
+       legend = c("Toy Example 1", 
+                  "Toy Example 2", 
+                  "First-Round"),
        lty = c(1, 4, 2))
 
