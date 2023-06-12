@@ -10,6 +10,8 @@ Human-Machine Annotation"*.
 ## Codes
 
 - `0611 Update`: 搭建了大致的代码结构，学习了argparse的使用，构建模拟数据集
+- `0612 Update`: 第一阶段待标注数据集抽取、标注者随机分配第一阶段数据集，模拟标注数据生成
+- `0613 Update`: 
 
 
 All the relevant codes and the corresponding graphs are listed in [codes](./codes/). A tree of the belongings are as follows
