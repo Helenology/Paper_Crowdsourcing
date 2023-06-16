@@ -9,7 +9,7 @@
 import numpy as np
 
 
-def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min):
+def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=0):
     """
 
     :param X1: first-round feature vectors
@@ -19,8 +19,11 @@ def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min):
     :param alpha_list: the probability of assigning each instance to each annotator
     :param per_min: the minimum number of annotators assigned to each instance
     :return: An annotation assignment matrix of size=(n, M) and a first-round annotation matrix of size=(n, M)
+    :param seed: random seed
     """
     n = X1.shape[0]  # size of first-round selected samples
+    np.random.seed(seed)
+
     #################### annotation assignment matrix
     A1_annotation = np.random.binomial(1, alpha_list, size=(n, M))
     # the row summation of A1_annotation should not be 0
@@ -38,7 +41,7 @@ def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min):
     epsilon = np.random.normal(loc=0, scale=sigma0_list, size=(n, M))  # random noise
     common_decision = (X1.dot(beta0)).reshape((n, 1))
     Y1_annotation = (common_decision + epsilon > 0).astype(int)  # first-round annotation matrix
-    Y1_annotation *= A1_annotation  # only preserve where a_im=1
+    # Y1_annotation *= A1_annotation  # only preserve where a_im=1
 
     return A1_annotation, Y1_annotation
 

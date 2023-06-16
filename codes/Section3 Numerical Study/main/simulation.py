@@ -8,14 +8,21 @@
 
 import sys
 import os
-
+import time
 sys.path.append(os.path.abspath('../data/'))
+sys.path.append(os.path.abspath('../model/'))
 from synthetic_dataset import *  # codes to generate a synthetic dataset
 from synthetic_annotators import *
+from crowdsourcing_model import *
 import argparse
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
+
+
 
 # receive arguments from command line or use the default values
 parser = argparse.ArgumentParser(description='Argparse')
@@ -25,22 +32,24 @@ parser.add_argument('--dimension', '-p', help='dimension', default=10, type=int)
 parser.add_argument('--annotator_number', '-M', help='the number of first-round annotators', default=50, type=int)
 parser.add_argument('--first_round_ratio', '-r', help='the ratio of first-round subset', default=0.1, type=float)
 parser.add_argument('--alpha_list', '-alphas', nargs="*", type=float, help='probability of assigning instances',
-                    default=[0.1])
+                    default=[1])
 parser.add_argument('--per_min', '-per_min', type=int, help='the minimum number of annotators assigned to each instance', default=0)
+parser.add_argument('--repetition', '-repetition', type=int, help='repetition', default=1)
 args = parser.parse_args()
 
 
 def main():
     try:
-        seed = args.seed      # random seed
+        base_seed = args.seed      # random seed
         N = args.sample_size  # the sample size of the whole unlabeled dataset
         p = args.dimension    # the dimension of the features
         first_round_ratio = args.first_round_ratio  # the size of first-round subset
         M = args.annotator_number  # the number of the first-round annotators
         alpha_list = np.array(args.alpha_list)  # the probability of assigning first-round instances to first-round annotators
         per_min = args.per_min  # the minimum number of annotators assigned to each instance
+        repetition = args.repetition  # the repetition time
         print(f"Received hyper-parameters:")
-        print(f"\t- Random Seed: {seed}")
+        print(f"\t- Random Seed: {base_seed}")
         print(f"\t- Sample Size: N={N}")
         print(f"\t- Dimension: p={p}")
         print(f"\t- First-Round Ratio: {first_round_ratio}")
@@ -63,7 +72,9 @@ def main():
         raise ValueError(f"There exists at least one alpha < 0 or > 1!")
 
     # trim the alpha_list / M
-    if len(alpha_list) != M:
+    if len(alpha_list) == 1:
+        alpha_list = np.array([alpha_list[0]] * M)
+    elif len(alpha_list) != M:
         print(f"Warning: The number of first-round annotators is M={M}.")
         tmplen = min(len(alpha_list), 5)
         print(f"Warning: alpha_list[:{tmplen}]={alpha_list[0:tmplen]} with size={len(alpha_list)}.")
@@ -77,22 +88,46 @@ def main():
     print(f"\t- Min Average # of Annotators Per Instance: {per_min}")
 
     ##################  parameter of interest + synthetic dataset
+    np.random.seed(base_seed)
     beta0 = np.ones(p)  # the true parameter of interest
-    X, Y_true = construct_synthetic_dataset(N, p, beta0, seed=seed)  # generate synthetic dataset
+    X, Y_true = construct_synthetic_dataset(N, p, beta0, seed=base_seed)  # generate synthetic dataset
+    rmse_results = []
 
-    ##################  first-round sample selection
-    X1, X2, Y1_true, Y2_true = train_test_split(X, Y_true, random_state=0, test_size=(1 - first_round_ratio))
-    n = X1.shape[0]     # the size of the first-round selected samples
+    for seed in range(repetition):
+        seed += base_seed
+        ##################  first-round sample selection
+        X1, X2, Y1_true, Y2_true = train_test_split(X, Y_true, random_state=0, test_size=(1 - first_round_ratio))
 
-    # generate synthetic annotators
-    sigma0_list = np.ones(M)
-    sigma0_list[1:] *= np.random.chisquare(1, size=M-1)
-    sigma0_list[sigma0_list == 0] = 1e-3  # sigma should not be 0
-    # synthetic annotations
-    A1_annotation, Y1_annotation = synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min)
+        # generate synthetic annotators
+        sigma0_list = np.ones(M)
+        # sigma0_list[1:] *= np.random.chisquare(1, size=M-1)
+        sigma0_list[sigma0_list < 1e-3] = 1e-3  # sigma should not be 0
+        # synthetic annotations
+        A1_annotation, Y1_annotation = synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=seed)
 
-
+        # maximum likelihood estimation
+        theta0 = np.append(beta0, sigma0_list[1:])
+        # a = neg_loglikelihood(theta0, X1, Y1_annotation, A1_annotation)
+        # print(a)
+        # b = neg_loglikelihood(np.ones(p + M - 1) * 0.1, X1, Y1_annotation, A1_annotation)
+        # print(b)
+        # res = crowdsourcing_model(X1, Y1_annotation, A1_annotation)
+        # print(res)
+        # if res.success:  # True
+        #     rmse = np.sqrt(mean_squared_error(res.x, theta0))
+        #     rmse_results.append([seed, rmse])
+        #     print(f"Success: seed={seed} with RMSE{rmse: .6f}")
+        # else:
+        #     print(f"Error: seed={seed} failed in optimization!")
+        score_vec = score_function(X1, Y1_annotation, A1_annotation, theta0)
+        print(score_vec)
+        print(score_vec.shape)
+    # rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE'])
+    # rmse_DF.to_csv(f"./results/rmse-N{N}-p{p}-M{M}-r{first_round_ratio}.csv")
 
 
 if __name__ == "__main__":
+    t1 = time.time()
     main()
+    t2 = time.time()
+    print(f"time: {t2 - t1:.6f}")

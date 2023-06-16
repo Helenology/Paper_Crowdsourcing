@@ -19,7 +19,7 @@ def construct_synthetic_dataset(N, p, beta0, seed=0):
     :param seed: the random seed for reproducibility
     :return: the unlabeled dataset with X(features) and Y(true labels)
     """
-
+    np.random.seed(seed)
     X = np.random.randn(N, p)  # features
     X[:, 0] = 1  # set the first columns of X to be constants
     Y_true = (X.dot(beta0) > 0).astype(int)  # true labels
