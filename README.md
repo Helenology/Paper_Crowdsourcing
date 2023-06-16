@@ -14,6 +14,8 @@ Human-Machine Annotation"*.
 - `0613 Update`: 模型算法
 - `0614`: debug
 - `0615`: 修改算法优化为 Netwon-Raphson，测试
+- `0616`: 发现 Netwon-Raphson 一阶导代入 python 自带模块后报错，还在 debug
+
 
 - [ ] per_min那里，大致是希望如果实际不满足per_min个标注者，可不可以再分配几个标注者达到per_min的数量，是符合实际要求，但是不符合模型设定
 

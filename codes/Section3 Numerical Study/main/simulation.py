@@ -107,21 +107,19 @@ def main():
 
         # maximum likelihood estimation
         theta0 = np.append(beta0, sigma0_list[1:])
-        # a = neg_loglikelihood(theta0, X1, Y1_annotation, A1_annotation)
-        # print(a)
-        # b = neg_loglikelihood(np.ones(p + M - 1) * 0.1, X1, Y1_annotation, A1_annotation)
-        # print(b)
-        # res = crowdsourcing_model(X1, Y1_annotation, A1_annotation)
-        # print(res)
-        # if res.success:  # True
-        #     rmse = np.sqrt(mean_squared_error(res.x, theta0))
-        #     rmse_results.append([seed, rmse])
-        #     print(f"Success: seed={seed} with RMSE{rmse: .6f}")
-        # else:
-        #     print(f"Error: seed={seed} failed in optimization!")
-        score_vec = score_function(X1, Y1_annotation, A1_annotation, theta0)
-        print(score_vec)
-        print(score_vec.shape)
+
+        res = crowdsourcing_model(X1, Y1_annotation, A1_annotation)
+        print(res)
+        if res.success:  # True
+            rmse = np.sqrt(mean_squared_error(res.x, theta0))
+            rmse_results.append([seed, rmse])
+            print(f"Success: seed={seed} with RMSE{rmse: .6f}")
+        else:
+            print(f"Error: seed={seed} failed in optimization!")
+        # score_vec = score_function(theta0, X1, Y1_annotation, A1_annotation)
+        # print(score_vec)
+        # print(score_vec.shape)
+
     # rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE'])
     # rmse_DF.to_csv(f"./results/rmse-N{N}-p{p}-M{M}-r{first_round_ratio}.csv")
 
