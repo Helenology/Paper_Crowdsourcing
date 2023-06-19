@@ -27,21 +27,21 @@ def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=0)
     #################### annotation assignment matrix
     A1_annotation = np.random.binomial(1, alpha_list, size=(n, M))
     # the row summation of A1_annotation should not be 0
-    A1_rowsum = A1_annotation.sum(axis=1)
-    if (A1_rowsum < per_min).sum() > 0:
-        print(f"Warning: The per_min({per_min}) is not reached! Please modify this code later!")
-    i = 0
-    while (A1_rowsum == 0).sum() > 0:
-        A1_annotation = np.random.binomial(1, alpha_list, size=(n, M))
-        A1_rowsum = A1_annotation.sum(axis=1)
-        print(f"A1_rowsum has element 0. Try {i} times.")
-        i = i + 1
+    # A1_rowsum = A1_annotation.sum(axis=1)
+    # if (A1_rowsum < per_min).sum() > 0:
+    #     print(f"Warning: The per_min({per_min}) is not reached! Please modify this code later!")
+    # i = 0
+    # while (A1_rowsum == 0).sum() > 0:
+    #     A1_annotation = np.random.binomial(1, alpha_list, size=(n, M))
+    #     A1_rowsum = A1_annotation.sum(axis=1)
+    #     print(f"A1_rowsum has element 0. Try {i} times.")
+    #     i = i + 1
 
     #################### first-round annotation matrix
     epsilon = np.random.normal(loc=0, scale=sigma0_list, size=(n, M))  # random noise
     common_decision = (X1.dot(beta0)).reshape((n, 1))
     Y1_annotation = (common_decision + epsilon > 0).astype(int)  # first-round annotation matrix
-    # Y1_annotation *= A1_annotation  # only preserve where a_im=1
+    Y1_annotation *= A1_annotation  # only preserve where a_im=1
 
     return A1_annotation, Y1_annotation
 

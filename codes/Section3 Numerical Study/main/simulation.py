@@ -22,8 +22,6 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 
 
-
-
 # receive arguments from command line or use the default values
 parser = argparse.ArgumentParser(description='Argparse')
 parser.add_argument('--seed', '-seed', help='random seed', default=0, type=int)
@@ -33,8 +31,11 @@ parser.add_argument('--annotator_number', '-M', help='the number of first-round 
 parser.add_argument('--first_round_ratio', '-r', help='the ratio of first-round subset', default=0.1, type=float)
 parser.add_argument('--alpha_list', '-alphas', nargs="*", type=float, help='probability of assigning instances',
                     default=[1])
-parser.add_argument('--per_min', '-per_min', type=int, help='the minimum number of annotators assigned to each instance', default=0)
+parser.add_argument('--per_min', '-per_min', type=int,
+                    help='the minimum number of annotators assigned to each instance',
+                    default=0)
 parser.add_argument('--repetition', '-repetition', type=int, help='repetition', default=1)
+parser.add_argument('--optimize', '-opt', type=int, help='optimization algorithm', default=0)
 args = parser.parse_args()
 
 
@@ -48,6 +49,7 @@ def main():
         alpha_list = np.array(args.alpha_list)  # the probability of assigning first-round instances to first-round annotators
         per_min = args.per_min  # the minimum number of annotators assigned to each instance
         repetition = args.repetition  # the repetition time
+        optimize = args.optimize  # use the default scipy optimization
         print(f"Received hyper-parameters:")
         print(f"\t- Random Seed: {base_seed}")
         print(f"\t- Sample Size: N={N}")
@@ -107,21 +109,23 @@ def main():
 
         # maximum likelihood estimation
         theta0 = np.append(beta0, sigma0_list[1:])
-
-        res = crowdsourcing_model(X1, Y1_annotation, A1_annotation)
+        res = crowdsourcing_model(X1, Y1_annotation, A1_annotation, optimize=optimize)
         print(res)
-        if res.success:  # True
-            rmse = np.sqrt(mean_squared_error(res.x, theta0))
-            rmse_results.append([seed, rmse])
-            print(f"Success: seed={seed} with RMSE{rmse: .6f}")
+        if optimize == 0:
+            if res.success:  # True
+                rmse = np.sqrt(mean_squared_error(res.x, theta0))
+                rmse_results.append([seed, rmse])
+                print(f"Success: seed={seed} with RMSE{rmse: .6f}")
+            else:
+                # print(f"Hessian_Inverse: {res.hess_inv}")
+                print(f"Error: seed={seed} failed in optimization!")
         else:
-            print(f"Error: seed={seed} failed in optimization!")
-        # score_vec = score_function(theta0, X1, Y1_annotation, A1_annotation)
-        # print(score_vec)
-        # print(score_vec.shape)
-
-    # rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE'])
-    # rmse_DF.to_csv(f"./results/rmse-N{N}-p{p}-M{M}-r{first_round_ratio}.csv")
+            rmse = np.sqrt(mean_squared_error(res, theta0))
+            rmse_results.append([seed, rmse])
+            print(f"Seed={seed} with RMSE{rmse: .6f}")
+    # #
+    # # rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE'])
+    # # rmse_DF.to_csv(f"./results/rmse-N{N}-p{p}-M{M}-r{first_round_ratio}.csv")
 
 
 if __name__ == "__main__":
