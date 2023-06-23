@@ -1,4 +1,5 @@
 library(stringr)
+library(plyr)
 
 # 设置工作目录
 setwd("/Users/helenology/Desktop/光华/\ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/main/results/")
@@ -17,11 +18,22 @@ for(i in 1:length(all_csv_data)){
 }
 
 # 正则匹配
-data$X = str_extract(data$X, pattern = "N\\d+")
+data$alpha = str_extract(data$X, pattern = "alpha.{3}")
+data$r = str_extract(data$X, pattern = "r(\\d|\\.)+")
 
 
-boxplot(RMSE ~ X, data = data,
-        xlab = "",
-        ylab = "RMSE"#,
+# alpha + r
+boxplot(RMSE ~ alpha + r, data = data,
+        xlab = "")
+        # ylab = "log(RMSE)"#,
         # names=c(0, 1)
-        )
+
+mean_RMSE = ddply(data, .(alpha, r), function(x){
+  mean(x$RMSE)
+}); mean_RMSE
+
+median_RMSE = ddply(data, .(alpha, r), function(x){
+  median(x$RMSE)
+}); median_RMSE
+
+write.csv(median_RMSE, "/Users/helenology/Desktop/median_RMSE.csv")

@@ -159,6 +159,15 @@ def hessian_function(theta, X, Y_annotation, A_annotation):
 def crowdsourcing_model(X, Y_annotation, A_annotation, optimize):
     n, p = X.shape
     M = Y_annotation.shape[1]
+    if optimize == -1:
+        print(f"Use default scipy optimization with its point-wise estimated gradient.")
+        theta_start = np.random.rand(p + M - 1)  # initial values
+        res = minimize(neg_loglikelihood,
+                       theta_start,
+                       method='L-BFGS-B',  # L-BFGS-B, SLSQP, Newton-CG
+                       args=(X, Y_annotation, A_annotation),
+                       options={'disp': False})
+        return res
     if optimize == 0:
         print(f"Use default scipy optimization.")
         theta_start = np.random.rand(p + M - 1)  # initial values
@@ -167,13 +176,13 @@ def crowdsourcing_model(X, Y_annotation, A_annotation, optimize):
                        method='L-BFGS-B',  # L-BFGS-B, SLSQP, Newton-CG
                        args=(X, Y_annotation, A_annotation),
                        jac=score_function,
-                       options={'disp': True})
+                       options={'disp': False})
         return res
     elif optimize == 1:
         print(f"Use Newton-Raphson algorithm.")
         theta_pre = None
-        theta_now = np.ones(p + M - 1)
-        maxIter = 50
+        theta_now = np.random.rand(p + M - 1)
+        maxIter = 200
         i = 0
         gtol = 1e-6
         while i < maxIter:
@@ -194,8 +203,8 @@ def crowdsourcing_model(X, Y_annotation, A_annotation, optimize):
 
 if __name__ == '__main__':
     N = 10001
-    p = 3
-    M = 3
+    p = 11
+    M = 11
     alpha_list = [1] * M
     X = np.random.randn(N, p)  # features
     X[:, 0] = 1  # set the first columns of X to be constants

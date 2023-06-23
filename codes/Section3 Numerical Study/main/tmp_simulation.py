@@ -42,7 +42,7 @@ args = parser.parse_args()
 
 def main():
     try:
-        seed = args.seed  # random seed
+        base_seed = args.seed  # random seed
         N = args.sample_size  # the sample size of the whole unlabeled dataset
         p = args.dimension  # the dimension of the features
         first_round_ratio = args.first_round_ratio  # the size of first-round subset
@@ -52,13 +52,13 @@ def main():
         per_min = args.per_min  # the minimum number of annotators assigned to each instance
         repetition = args.repetition  # the repetition time
         optimize = args.optimize  # use the default scipy optimization
-    #         print(f"Received hyper-parameters:")
-    #         print(f"\t- Random Seed: {seed}")
-    #         print(f"\t- Sample Size: N={N}")
-    #         print(f"\t- Dimension: p={p}")
-    #         print(f"\t- First-Round Ratio: {first_round_ratio}")
-    #         print(f"\t- First-Round Annotators: M={M}")
-    #         print(f"\t- First-Round alpha_list: {alpha_list}")
+        print(f"Received hyper-parameters:")
+        print(f"\t- Random Seed: {base_seed}")
+        print(f"\t- Sample Size: N={N}")
+        print(f"\t- Dimension: p={p}")
+        print(f"\t- First-Round Ratio: {first_round_ratio}")
+        print(f"\t- First-Round Annotators: M={M}")
+        print(f"\t- First-Round alpha_list: {alpha_list}")
     except Exception as e:  # errors
         print(e)
 
@@ -88,76 +88,49 @@ def main():
         elif len(alpha_list) > M:
             print(f"Warning: We only reserve the first M({M}) elements.")
             alpha_list = alpha_list[0:M]
-    #     print(f"\t- Average # of Annotators Per Instance: {alpha_list.sum()}")
-    #     print(f"\t- Min Average # of Annotators Per Instance: {per_min}")
+    print(f"\t- Average # of Annotators Per Instance: {alpha_list.sum()}")
+    print(f"\t- Min Average # of Annotators Per Instance: {per_min}")
 
     ##################  parameter of interest + synthetic dataset
-    np.random.seed(0)
+    np.random.seed(base_seed)
     beta0 = np.ones(p)  # the true parameter of interest
-    X, Y_true = construct_synthetic_dataset(N, p, beta0, seed=0)  # generate synthetic dataset
+    X, Y_true = construct_synthetic_dataset(N, p, beta0, seed=base_seed)  # generate synthetic dataset
     rmse_results = []
-    old_rmse = None
 
-    # generate synthetic annotators
-    sigma0_list = np.ones(M)
-    # sigma0_list[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[1:]  # np.random.chisquare(1, size=M-1)
-    sigma0_list[sigma0_list < 1e-3] = 1e-3  # sigma should not be 0
-    theta0 = np.append(beta0, sigma0_list[1:])  # true parameters
-
-    for _ in range(repetition):
-        np.random.seed(seed)
-        # first-round sample selection
+    for seed in range(repetition):
+        t1 = time.time()
+        seed += base_seed
+        ##################  first-round sample selection
         X1, X2, Y1_true, Y2_true = train_test_split(X, Y_true, random_state=seed, test_size=(1 - first_round_ratio))
 
+        # generate synthetic annotators
+        sigma0_list = np.ones(M)
+        sigma0_list[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[1:]  # np.random.chisquare(1, size=M-1)
+        sigma0_list[sigma0_list < 1e-3] = 1e-3  # sigma should not be 0
         # synthetic annotations
         A1_annotation, Y1_annotation = synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=seed)
 
         # maximum likelihood estimation
-        t1 = time.time()
-        if optimize == 0:
-            iter = 0
-            maxTry = 2
-            rmse_result = [seed, None, optimize]  # seed, RMSE, optimize_method
-
-            np.random.seed(seed)
-            while iter < maxTry:
-                res = crowdsourcing_model(X1, Y1_annotation, A1_annotation, optimize=0)
-                if res.success:
-                    rmse = np.sqrt(mean_squared_error(res.x, theta0))
-                    if old_rmse is None or (rmse < 5 * old_rmse or rmse > old_rmse / 5):
-                        t2 = time.time()
-                        print(f"Success: seed={seed} with RMSE{rmse} and time{t2 - t1: .6f}")
-                        rmse_result[1] = rmse
-                        break
-                iter += 1
-
-            if rmse_result[1] is None:
-                print(f"Use default scipy optimization with its point-wise estimated gradient.")
-                res = crowdsourcing_model(X1, Y1_annotation, A1_annotation, optimize=-1)  # optimize again
-                if res.success:
-                    rmse = np.sqrt(mean_squared_error(res.x, theta0))
-                    if old_rmse is None or (rmse < 5 * old_rmse or rmse > old_rmse / 5):
-                        t2 = time.time()
-                        print(f"Success: seed={seed} with RMSE{rmse} and time{t2 - t1: .6f}")
-                        rmse_result[1] = rmse
-                        rmse_result[2] = -1
-            if rmse_result[1] is None:
-                print(f"Error: seed={seed} failed in optimization!")
-                rmse_result[1] = "ERROR"
-
-            rmse_results.append(rmse_result)
-
-        elif optimize == 1:
-            res = crowdsourcing_model(X1, Y1_annotation, A1_annotation, optimize=optimize)  # optimize again
-            rmse = np.sqrt(mean_squared_error(res, theta0))
-            rmse_results.append([seed, rmse, 1])
-            t2 = time.time()
-            print(f"Seed={seed} with RMSE{rmse} and time{t2 - t1: .6f}")
-
+        theta0 = np.append(beta0, sigma0_list[1:])
+        res = crowdsourcing_model(X1, Y1_annotation, A1_annotation, optimize=optimize)
         print(res)
-        # rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE', 'opt'])
-        # rmse_DF.to_csv(f"./results/rmse-alpha{alpha_list[0]}-r{first_round_ratio}.csv")
-        seed += 1
+        if optimize == 0:
+            if res.success:  # True
+                rmse = np.sqrt(mean_squared_error(res.x, theta0))
+                rmse_results.append([seed, rmse])
+                t2 = time.time()
+                print(f"Success: seed={seed} with RMSE{rmse: .6f} and time{t2 - t1: .6f}")
+            else:
+                # print(f"Hessian_Inverse: {res.hess_inv}")
+                print(f"Error: seed={seed} failed in optimization!")
+        else:
+            rmse = np.sqrt(mean_squared_error(res, theta0))
+            rmse_results.append([seed, rmse])
+            t2 = time.time()
+            print(f"Seed={seed} with RMSE{rmse: .6f} and time{t2 - t1: .6f}")
+
+        rmse_DF = pd.DataFrame(rmse_results, columns=['seed', 'RMSE'])
+        rmse_DF.to_csv(f"./results/rmse-N{N}-p{p}-M{M}-alpha{alpha_list[0]}-r{first_round_ratio}-opt{optimize}.csv")
 
 
 if __name__ == "__main__":
