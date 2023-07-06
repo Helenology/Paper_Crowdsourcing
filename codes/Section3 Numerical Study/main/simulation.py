@@ -20,38 +20,21 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-import numpy as np
 import multiprocessing
-
-# receive arguments from command line or use the default values
-parser = argparse.ArgumentParser(description='Argparse')
-parser.add_argument('--seed', '-seed', help='random seed', default=0, type=int)
-parser.add_argument('--sample_size', '-N', help='sample size', default=10000, type=int)
-parser.add_argument('--dimension', '-p', help='dimension', default=10, type=int)
-parser.add_argument('--annotator_number', '-M', help='the number of first-round annotators', default=50, type=int)
-parser.add_argument('--first_round_ratio', '-r', help='the ratio of first-round subset', default=0.1, type=float)
-parser.add_argument('--alpha_list', '-alphas', nargs="*", type=float, help='probability of assigning instances',
-                    default=[1])
-parser.add_argument('--per_min', '-per_min', type=int,
-                    help='the minimum number of annotators assigned to each instance',
-                    default=0)
-parser.add_argument('--repetition', '-repetition', type=int, help='repetition', default=1)
-parser.add_argument('--optimize', '-opt', type=int, help='optimization algorithm', default=0)
-args = parser.parse_args()
 
 
 def main():
     try:
-        seed = args.seed  # random seed
-        N = args.sample_size  # the sample size of the whole unlabeled dataset
-        p = args.dimension  # the dimension of the features
-        first_round_ratio = args.first_round_ratio  # the size of first-round subset
-        M = args.annotator_number  # the number of the first-round annotators
-        alpha_list = np.array(
-            args.alpha_list)  # the probability of assigning first-round instances to first-round annotators
-        per_min = args.per_min  # the minimum number of annotators assigned to each instance
-        repetition = args.repetition  # the repetition time
-        optimize = args.optimize  # use the default scipy optimization
+        # seed = args.seed  # random seed
+        # N = args.sample_size  # the sample size of the whole unlabeled dataset
+        # p = args.dimension  # the dimension of the features
+        # first_round_ratio = args.first_round_ratio  # the size of first-round subset
+        # M = args.annotator_number  # the number of the first-round annotators
+        # alpha_list = np.array(
+        #     args.alpha_list)  # the probability of assigning first-round instances to first-round annotators
+        # per_min = args.per_min  # the minimum number of annotators assigned to each instance
+        # repetition = args.repetition  # the repetition time
+        # optimize = args.optimize  # use the default scipy optimization
     #         print(f"Received hyper-parameters:")
     #         print(f"\t- Random Seed: {seed}")
     #         print(f"\t- Sample Size: N={N}")
@@ -95,14 +78,15 @@ def main():
     np.random.seed(0)
     beta0 = np.ones(p)  # the true parameter of interest
     X, Y_true = construct_synthetic_dataset(N, p, beta0, seed=0)  # generate synthetic dataset
-    rmse_results = []
-    old_rmse = None
 
     # generate synthetic annotators
     sigma0_list = np.ones(M)
     # sigma0_list[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[1:]  # np.random.chisquare(1, size=M-1)
     sigma0_list[sigma0_list < 1e-3] = 1e-3  # sigma should not be 0
     theta0 = np.append(beta0, sigma0_list[1:])  # true parameters
+
+    rmse_results = []
+    old_rmse = None
 
     for _ in range(repetition):
         np.random.seed(seed)

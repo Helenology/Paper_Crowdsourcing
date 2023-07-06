@@ -9,7 +9,7 @@
 import numpy as np
 
 
-def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=0):
+def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, seed=0):
     """
 
     :param X1: first-round feature vectors
@@ -17,7 +17,6 @@ def synthetic_annotation(X1, beta0, M, sigma0_list, alpha_list, per_min, seed=0)
     :param M: the number of annotators
     :param sigma0_list: the standard deviation of first-round annotators
     :param alpha_list: the probability of assigning each instance to each annotator
-    :param per_min: the minimum number of annotators assigned to each instance
     :return: An annotation assignment matrix of size=(n, M) and a first-round annotation matrix of size=(n, M)
     :param seed: random seed
     """

@@ -11,9 +11,7 @@ import numpy as np
 import sys
 import os
 from scipy.stats import norm
-from statsmodels.base.model import GenericLikelihoodModel
 from scipy.optimize import minimize, newton, approx_fprime
-from scipy.stats import norm
 sys.path.append(os.path.abspath('../data/'))
 from synthetic_annotators import *
 import copy

@@ -18,9 +18,9 @@ Human-Machine Annotation"*.
 - `0616-0618`: 全在debug一阶导，然后0618晚上发现在某个地方转换一下正负号就对了，然后顺着这个思路去检查，发现了bug！
 - `0619`: debug二阶导，有些参数迭代后发散，于是猜测代码或者pdf里写错了，保证代码和pdf一致后，一定是pdf哪里错了，于是顺着这个思路去找，找到了一个地方的数学推导有问题，改正过来以后结果没问题了
 - `0623`: 文章框架有大的改动，暂停更新
+- `0706`: 更新INR算法，给定$\sigma_m$真值优化$\beta$没有问题，目前的bug是给定$\beta$真值优化$\sigma_m$仍然有bug，正在debug
 
 
-- [ ] per_min那里，大致是希望如果实际不满足per_min个标注者，可不可以再分配几个标注者达到per_min的数量，是符合实际要求，但是不符合模型设定
 
 All the relevant codes and the corresponding graphs are listed in [codes](./codes/). A tree of the belongings are as follows
 
@@ -31,27 +31,17 @@ codes
 │   ├── sigma_simulation.ipynb
 │   ├── trace.csv
 │   └── trace.pdf
-├── Section2.4 Reinforced Labeling
-│   ├── plot_round12_diff.R
-│   ├── second-round probability.ipynb
-│   ├── two-rounds-confidence.pdf
-│   └── two_rounds_props.csv
 ├── Section3 Numerical Study
-│   ├── Simulation Study.ipynb
+│   ├── Hyper_Parameters.xlsx
+│   ├── __pycache__
 │   ├── data
-│   │   ├── __pycache__
-│   │   │   └── synthetic_dataset.cpython-39.pyc
-│   │   ├── synthetic_annotators.py
-│   │   └── synthetic_dataset.py
 │   ├── main
-│   │   ├── __pycache__
-│   │   │   └── simulation.cpython-39-pytest-6.2.4.pyc
-│   │   └── simulation.py
-│   └── utils
-│       └── __pycache__
+│   ├── model
+│   └── utils.py
 └── 验证加入超级annotator之后是否结果变差
     ├── MLE.ipynb
     ├── test.csv
     └── 加入专家对比.R
 
-11 directories, 17 files
+8 directories, 9 files
+```
