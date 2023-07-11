@@ -22,6 +22,8 @@ Human-Machine Annotation"*.
 - `0707`: 检查了公式，发现没有问题，因此是算法比较依赖于初始值，如果初始值在真值附近，那么优化会比较容易，如果初始值选的不好， $\sigma_m$ 可能出现负数，或者发散，因此接下来考虑利用这个观察和加入格点搜索来优化
 - `0708`: 对于 $\sigma_m$ 增加了 reinitialization 部分的代码，如果给定 $\beta$ 的真值，优化没有太大的问题了，但是没给定真值时仍然有点 bug
 - `0709`: 整理完 INR代码+ One-Step代码
+- `0710`: 喝酒去了
+- `0711`: 部署完并行计算的代码了，目前有个小问题，那就是主程序也许使用共享内存可以加快速度，但是我简单尝试了一下本地共享内存会报错，为了跳过这个bug，只好使用一种较为stupid的办法，那就是控制随机数后在各个进程中重新生成一模一样的数据
 
 
 All the relevant codes and the corresponding graphs are listed in [codes](./codes/). A tree of the belongings are as follows
