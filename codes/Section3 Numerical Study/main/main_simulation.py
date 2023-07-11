@@ -28,47 +28,89 @@ from INR import *
 import csv
 
 
-def get_hyper_parameter(name):
+def get_hyper_parameter(hyper_parameters, name):
     param = hyper_parameters[hyper_parameters['Hyper_Parameter'] == name].iloc[0, 1]
     return param
 
 
-def main():
-    pass
+def map_func(params):
+    # get hyper parameters
+    path = "/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/Hyper_Parameters.xlsx"
+    hyper_parameters = pd.read_excel(path)
+    seed = get_hyper_parameter(hyper_parameters, "seed")  # random seed
+    N = get_hyper_parameter(hyper_parameters, "N")  # the sample size of the whole unlabeled dataset
+    p = get_hyper_parameter(hyper_parameters, "p")  # the dimension of the features
+    M = get_hyper_parameter(hyper_parameters, "M")  # the number of the first-round annotators
 
+    # get iteration parameters
+    alpha = params[0]
+    alpha_list = [alpha] * M
+    subset_ratio = params[1]
+    rep = params[2]
+    print(f"Launching Process with alpha({alpha}), subset({subset_ratio}), and repetition({rep})")
 
-def map_func():
-    pass
-
-if __name__ == "__main__":
-    hyper_parameters = pd.read_excel(
-        "/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/Hyper_Parameters.xlsx")
-
-    # hyper parameters
-    seed = get_hyper_parameter("seed")  # random seed
-    N = get_hyper_parameter("N")  # the sample size of the whole unlabeled dataset
-    p = get_hyper_parameter("p")  # the dimension of the features
-    subset_ratio = get_hyper_parameter("subset_ratio")  # subset_ratio = |first-round subset| / N
-    subset_ratio_list = [float(item) for item in subset_ratio.split()]  # convert to a list of subset ratios
-    M = get_hyper_parameter("M")  # the number of the first-round annotators
-    alpha = get_hyper_parameter("alpha")  # the instance assignment probability
-    alphas = [float(item) for item in alpha.split()]  # convert to a list of alphas
-    repetition = get_hyper_parameter("repetition")  # the repetition times
-    alphas = [0.2]
-    subset_ratio_list = [0.1]
-
-
-    ##################  parameter of interest + synthetic dataset
+    # parameter of interest + synthetic dataset
     np.random.seed(seed)  # set random seed
     beta_star = np.ones(p)  # the true parameter of interest
     X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=0)  # generate synthetic dataset
 
     # generate synthetic annotators
     sigma_star = np.ones(M)
-    sigma_star[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
+    sigma_star[1:int(M/2)] *= 0.1  # np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
+    sigma_star[int(M / 2):M] *= 10
 
-    # parameter set
-    theta_star = np.append(beta_star, sigma_star[1:])  # true parameters
+    # first-round sample selection
+    np.random.seed(rep)
+    X1, X2, Y1_true, Y2_true = train_test_split(X, Y_true, test_size=(1 - subset_ratio), random_state=rep)
+    # synthetic annotations
+    A1_annotation, Y1_annotation = synthetic_annotation(X1, beta_star, M, sigma_star, alpha_list, seed=rep)
+
+    # One-Step Algorithm
+    t1 = time.time()
+    os = OS(X1, Y1_annotation, A1_annotation)
+    os.OS_algorithm()
+    t2 = time.time()
+    os_time = t2 - t1
+    os_beta_mse = mean_squared_error(beta_star, os.beta_hat)
+    os_sigma_mse = mean_squared_error(sigma_star, os.sigma_hat)
+
+    # INR Algorithm
+    t3 = time.time()
+    inr = INR(X1, Y1_annotation, A1_annotation)
+    inr.INR_algorithm(maxIter=50)
+    t4 = time.time()
+    inr_time = t4 - t3
+    inr_beta_mse = mean_squared_error(beta_star, inr.beta_hat)
+    inr_sigma_mse = mean_squared_error(sigma_star, inr.sigma_hat)
+
+    results = [alpha, subset_ratio, rep, os_time, os_beta_mse, os_sigma_mse, inr_time, inr_beta_mse, inr_sigma_mse]
+    with open(f'/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/main/results/simulation-alpha({alpha})-subset({subset_ratio}).csv',
+            'a') as f:
+        csv_write = csv.writer(f)
+        csv_write.writerow(results)
+    return None
+
+
+if __name__ == "__main__":
+    # get hyper parameters
+    path = "/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/Hyper_Parameters.xlsx"
+    hyper_parameters = pd.read_excel(path)
+    alpha = get_hyper_parameter(hyper_parameters, "alpha")  # the instance assignment probability
+    alphas = [float(item) for item in alpha.split()]  # convert to a list of alphas
+    repetition = get_hyper_parameter(hyper_parameters, "repetition")  # the repetition times
+    alphas = [0.2, 0.5]
+    subset_ratio_list = [0.1]
+
+    for alpha in alphas:
+        for subset_ratio in subset_ratio_list:
+            # create the csv file for results
+            with open(
+                    f'/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/main/results/simulation-alpha({alpha})-subset({subset_ratio}).csv',
+                    'a') as f:
+                csv_write = csv.writer(f)
+                csv_write.writerow(
+                    ['alpha', 'subset_ratio', 'repetition', 'os_time', 'os_beta_mse', 'os_sigma_mse', 'inr_time',
+                     'inr_beta_mse', 'inr_sigma_mse'])
 
     # multi-processing
     NUM_THREADS = 4
@@ -79,61 +121,14 @@ if __name__ == "__main__":
     os.environ["OMP_NUM_THREADS"] = str(NUM_THREADS)
     NUM_PROCESS = NUM_CPU // NUM_THREADS
     print(f'最大并行进程数: {NUM_PROCESS}')
-
     # parameter dic for multi-processing
-    param_dict = {}
-    task_num = 1
+    param_list = [[i, j, k] for i in alphas for j in subset_ratio_list for k in range(repetition)]
+
+    # multiprocessing
+    with mp.Pool(NUM_PROCESS) as pool:
+        pool.map(map_func, param_list)
 
 
-
-
-
-
-
-    # create the csv file for results
-    with open('/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/main/results/simulation.csv', 'a') as f:
-        csv_write = csv.writer(f)
-        csv_write.writerow(['alpha', 'subset_ratio', 'repetition', 'os_time', 'os_beta_mse', 'os_sigma_mse', 'inr_time', 'inr_beta_mse', 'inr_sigma_mse'])
-
-    for alpha in alphas:
-        alpha_list = np.ones(M) * alpha
-        for subset_ratio in subset_ratio_list:
-            task_name = f"task{task_num}"
-            param_dict[task_name] = [alpha, subset_ratio]
-            task_num += 1
-
-            for rep in range(repetition):
-                print(f"{task_name} repetition {rep}")
-                np.random.seed(rep)
-                X1, X2, Y1_true, Y2_true = train_test_split(X, Y_true, random_state=rep,
-                                                            test_size=(1 - subset_ratio))
-                # synthetic annotations
-                A1_annotation, Y1_annotation = synthetic_annotation(X1, beta_star, M, sigma_star, alpha_list, seed=rep)
-
-                # One-Step Algorithm
-                t1 = time.time()
-                os = OS(X1, Y1_annotation, A1_annotation)
-                os.OS_algorithm()
-                t2 = time.time()
-                os_time = t2 - t1
-                os_beta_mse = mean_squared_error(beta_star, os.beta_hat)
-                os_sigma_mse = mean_squared_error(sigma_star, os.sigma_hat)
-
-                # INR Algorithm
-                t3 = time.time()
-                inr = INR(X1, Y1_annotation, A1_annotation)
-                inr.INR_algorithm(maxIter=50)
-                t4 = time.time()
-                inr_time = t4 - t3
-                inr_beta_mse = mean_squared_error(beta_star, inr.beta_hat)
-                inr_sigma_mse = mean_squared_error(sigma_star, inr.sigma_hat)
-
-                results = [alpha, subset_ratio, rep, os_time, os_beta_mse, os_sigma_mse, inr_time, inr_beta_mse, inr_sigma_mse]
-                with open(
-                        '/Users/helenology/Desktop/光华/ 论文/4-Crowdsourcing/codes/Section3 Numerical Study/main/results/simulation.csv',
-                        'a') as f:
-                    csv_write = csv.writer(f)
-                    csv_write.writerow(results)
 
 
 

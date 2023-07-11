@@ -1,3 +1,0 @@
-alpha,subset_ratio,repetition,os_time,os_beta_mse,os_sigma_mse,inr_time,inr_beta_mse,inr_sigma_mse
-0.1,0.1,0,3.619 ,0.020 ,0.670 ,13.247 ,0.070 ,1.530 
-0.2,0.1,0,4.730 ,0.002 ,0.067 ,13.134 ,0.074 ,1.447 
