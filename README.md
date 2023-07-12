@@ -7,7 +7,7 @@ Human-Machine Annotation"*.
 
 - [ ] todo
 
-## Codes
+## Coding History
 
 - `0611 Update`: 搭建了大致的代码结构，学习了argparse的使用，构建模拟数据集
 - `0612 Update`: 第一阶段待标注数据集抽取、标注者随机分配第一阶段数据集，模拟标注数据生成
@@ -24,7 +24,15 @@ Human-Machine Annotation"*.
 - `0709`: 整理完 INR代码+ One-Step代码
 - `0710`: 喝酒去了
 - `0711`: 部署完并行计算的代码了，目前有个小问题，那就是主程序也许使用共享内存可以加快速度，但是我简单尝试了一下本地共享内存会报错，为了跳过这个bug，只好使用一种较为stupid的办法，那就是控制随机数后在各个进程中重新生成一模一样的数据
+- `0712`: debug（INR算法出现了很多次崩溃）
+  > 1. Beta的初始值都用annotator1来估计，所以INR的beta初始值变好了
+  > 2. INR每一步迭代，先更新sigma，再更新beta
+  > 	【原因】beta的初始值很好，先固定beta更新sigma，可以让sigma迭代到一个较好的值时再更新beta
+  > 3. INR每一步迭代，更新sigma时更新好几次（我这里选择的5次），再更新一次beta
+  	【原因】观察发现，更新一次sigma时sigma的值仍然不太好，此时更新beta会让beta变差，于是最终的结果变得很差
 
+
+## Codes
 
 All the relevant codes and the corresponding graphs are listed in [codes](./codes/). A tree of the belongings are as follows
 

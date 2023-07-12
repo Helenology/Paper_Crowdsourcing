@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2023/6/29 10:22
 # @Author  : Helenology
-# @Site    :
+# @Site    : 
 # @File    : main_simulation.py
 # @Software: PyCharm
 
@@ -88,8 +88,6 @@ def map_func(params):
             'a') as f:
         csv_write = csv.writer(f)
         csv_write.writerow(results)
-    print(f"OS MSE:\n\tos_beta_mse: {os_beta_mse}\n\tos_sigma_mse: {os_sigma_mse:.6f}")
-    print(f"INR MSE:\n\tinr_beta_mse: {inr_beta_mse}\n\tinr_sigma_mse: {inr_sigma_mse:.6f}")
     return None
 
 
@@ -99,11 +97,9 @@ if __name__ == "__main__":
     hyper_parameters = pd.read_excel(path)
     alpha = get_hyper_parameter(hyper_parameters, "alpha")  # the instance assignment probability
     alphas = [float(item) for item in alpha.split()]  # convert to a list of alphas
-    # alphas = [0.1]
     repetition = get_hyper_parameter(hyper_parameters, "repetition")  # the repetition times
     subset_ratio = get_hyper_parameter(hyper_parameters, "subset_ratio")
     subset_ratio_list = [float(item) for item in subset_ratio.split()]
-    # subset_ratio_list = [0.05]
 
     for alpha in alphas:
         for subset_ratio in subset_ratio_list:
@@ -126,7 +122,6 @@ if __name__ == "__main__":
     NUM_PROCESS = NUM_CPU // NUM_THREADS
     print(f'最大并行进程数: {NUM_PROCESS}')
     # parameter dic for multi-processing
-    # param_list = [[i, j, 100] for i in alphas for j in subset_ratio_list]
     param_list = [[i, j, k] for i in alphas for j in subset_ratio_list for k in range(repetition)]
 
     # multiprocessing

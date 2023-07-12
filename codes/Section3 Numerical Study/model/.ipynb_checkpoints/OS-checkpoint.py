@@ -115,11 +115,10 @@ class OS:
         return sigma_mse
 
     def OS_algorithm(self):
-        sigma_mse = self.update_sigma()
-        print(f"update_sigma: sigma mse({sigma_mse:.4f})")
         beta_mse = self.update_beta()
         print(f"update_beta: beta mse({beta_mse:.4f})")
-
+        sigma_mse = self.update_sigma()
+        print(f"update_sigma: sigma mse({sigma_mse:.4f})")
 
 
 if __name__ == '__main__':
@@ -133,8 +132,8 @@ if __name__ == '__main__':
     beta_star = np.ones(p)  # the true parameter of interest
     sigma_star = np.ones(M)
     # sigma_star[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
-    sigma_star[1:int(M / 2)] *= 0.2
-    sigma_star[int(M / 2):] *= 5
+    sigma_star[1:int(M / 2)] *= 0.1
+    sigma_star[int(M / 2):] *= 10
     print(f"true beta: {beta_star}")
     print(f"true sigma: {sigma_star}")
     X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=0)  # generate synthetic dataset

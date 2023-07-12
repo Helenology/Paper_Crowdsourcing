@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time    : 2023/7/8 23:49
+# @Time    : 2023/7/5 21:17
 # @Author  : Helenology
 # @Site    : 
-# @File    : OS.py
+# @File    : INR.py
 # @Software: PyCharm
 
 import os
 import sys
-import numpy as np
 import time
+
+import numpy as np
 from sklearn.metrics import mean_squared_error
 from statsmodels.discrete.discrete_model import Probit
 import copy
@@ -21,7 +22,7 @@ from synthetic_annotators import *
 from utils import *
 
 
-class OS:
+class INR:
     def __init__(self, X, Y, A):
         self.X = X
         self.Y = Y
@@ -33,11 +34,13 @@ class OS:
         self.beta_initial = None
         self.beta_hat = None
         self.initialize_beta()
+        # self.beta_initial = np.random.rand(self.p, 1)  # np.ones((p, 1))
+        # self.beta_hat = copy.copy(self.beta_initial)
         # sigma initialization
-        self.sigma_initial = None
-        self.sigma_hat = None
-        self.initialize_sigma()
-        print(f"================= OS Algorithm =================")
+        self.sigma_initial = np.ones(self.M)  # np.random.rand(self.M)
+        self.sigma_initial[0] = 1
+        self.sigma_hat = copy.copy(self.sigma_initial)
+        print(f"================= INR Algorithm =================")
 
     def initialize_beta(self):
         A1 = self.A[:, 0]
@@ -49,18 +52,6 @@ class OS:
         beta_hat = probit_model.params.reshape(-1, 1)
         self.beta_initial = beta_hat
         self.beta_hat = copy.copy(beta_hat)
-
-    def initialize_sigma(self):
-        self.sigma_initial = np.ones(self.M)
-        Z = self.X.dot(self.beta_hat)
-        for annotator_index in range(1, self.M):
-            Ai = self.A[:, annotator_index]
-            Yi = self.Y[Ai == 1, annotator_index]
-            Zi = Z[Ai == 1]
-            probit_model = Probit(Yi, Zi)
-            model_outcome = probit_model.fit(disp=0)
-            self.sigma_initial[annotator_index] = 1 / model_outcome.params[0]
-        self.sigma_hat = copy.copy(self.sigma_initial)
 
     def update_beta(self):
         U = np.dot(self.X, self.beta_hat) / self.sigma_hat
@@ -111,21 +102,60 @@ class OS:
         new_sigma_hat[0] = 1
         sigma_mse = mean_squared_error(self.sigma_hat[1:], new_sigma_hat[1:])
         self.sigma_hat = new_sigma_hat
-
         return sigma_mse
 
-    def OS_algorithm(self):
-        sigma_mse = self.update_sigma()
-        print(f"update_sigma: sigma mse({sigma_mse:.4f})")
-        beta_mse = self.update_beta()
-        print(f"update_beta: beta mse({beta_mse:.4f})")
+    def INR_algorithm(self, maxIter=100, epsilon=1e-3, mseWarn=50):
+        for i in range(maxIter):
+            print(f'----------------- Iteration {i} -----------------')
+            beta_mse = self.update_beta()
+            print(f"update_beta: beta mse({beta_mse:.4f})")
+            print(f"beta_hat: {self.beta_hat.reshape(-1)}")
+            sigma_mse = self.update_sigma()
+            print(f"update_sigma: sigma mse({sigma_mse:.4f})")
+            print(f"sigma_hat: {self.sigma_hat}")
+            mse = beta_mse + sigma_mse
+            if mse < epsilon:  # the change of this and last step is small enough to stop the INR algorithm
+                print(f"Success with mean square change: {mse:.4f}")
+                return mse
+            if np.any(self.sigma_hat < 0) or sigma_mse > mseWarn or \
+                    (np.abs(self.sigma_hat - self.sigma_initial) < epsilon).sum() > 0:
+                self.reinitialize_sigma(epsilon)
 
+        print(f"Warning: reach the maxIter({maxIter}) with MSE: {mse:.4f}")
+        return mse
+
+    def reinitialize_sigma(self, epsilon=1e-3):
+        print(f'++++++++++++ reinitialize_sigma +++++++++++++++')
+        print("reinitialize_sigma:")
+        # seldom changed index
+        seldom_change_index = np.abs(self.sigma_hat - self.sigma_initial) < epsilon
+        if np.any(seldom_change_index):
+            self.sigma_initial[seldom_change_index] = self.sigma_initial[seldom_change_index] * 2
+            self.sigma_hat[seldom_change_index] = self.sigma_initial[seldom_change_index]
+            print(f"\tseldom changed index")
+
+        # if some sigma_hat < 0, then the initialization of it should be smaller
+        neg_index = self.sigma_hat < 0
+        if np.any(neg_index):
+            self.sigma_initial[neg_index] = self.sigma_initial[neg_index] / 2
+            self.sigma_hat[neg_index] = self.sigma_initial[neg_index]
+            print(f"\tnegative index")  # : {self.sigma_hat}
+
+        # if sigma's change is too fast, then the initialization should be larger
+        fast_change_index = self.sigma_hat > 10 * self.sigma_initial
+        if np.any(fast_change_index):
+            self.sigma_initial[fast_change_index] = self.sigma_initial[fast_change_index] / 2
+            self.sigma_hat[fast_change_index] = self.sigma_initial[fast_change_index]
+            print(f"\tfast change index")
+        self.sigma_hat[0] = 1
+        print(f"sigma_hat: {self.sigma_hat}")
+        print(f'+++++++++++++++++++++++++++++++++++++++++++++++')
 
 
 if __name__ == '__main__':
     N = 1000000
     p = 20
-    M = 50
+    M = 100
     seed = 0
     np.random.seed(seed)  # set random seed
     np.set_printoptions(precision=3)  # 设置小数位置为3位
@@ -133,25 +163,24 @@ if __name__ == '__main__':
     beta_star = np.ones(p)  # the true parameter of interest
     sigma_star = np.ones(M)
     # sigma_star[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
-    sigma_star[1:int(M / 2)] *= 0.2
-    sigma_star[int(M / 2):] *= 5
-    print(f"true beta: {beta_star}")
+    sigma_star[1:int(M / 2)] *= 0.1
+    sigma_star[int(M / 2):] *= 10
     print(f"true sigma: {sigma_star}")
     X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=0)  # generate synthetic dataset
     alpha_list = [0.1] * M
     A_annotation, Y_annotation = synthetic_annotation(X, beta_star, M, sigma_star, alpha_list, seed=seed)
 
     t1 = time.time()
-    os = OS(X, Y_annotation, A_annotation)
-    os.OS_algorithm()
+    inr = INR(X, Y_annotation, A_annotation)
+    inr.INR_algorithm(maxIter=50)
     t2 = time.time()
     print("=================================")
     print(f"Time: {t2 - t1:.4f}")
     print("------------- beta --------------")
     print(f"true beta: {beta_star}")
-    print(f"estimate beta: {os.beta_hat.reshape(-1)}")
-    print(f"final MSE: {mean_squared_error(beta_star, os.beta_hat):.6f}")
+    print(f"estimate beta: {inr.beta_hat.reshape(-1)}")
+    print(f"final MSE: {mean_squared_error(beta_star, inr.beta_hat):.4f}")
     print("------------- sigma -------------")
     print(f"true sigma: {sigma_star}")
-    print(f"estimate sigma: {os.sigma_hat}")
-    print(f"final MSE: {mean_squared_error(sigma_star, os.sigma_hat):.6f}")
+    print(f"estimate sigma: {inr.sigma_hat}")
+    print(f"final MSE: {mean_squared_error(sigma_star, inr.sigma_hat):.4f}")

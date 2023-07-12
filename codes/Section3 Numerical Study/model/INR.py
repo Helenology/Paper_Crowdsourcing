@@ -12,6 +12,7 @@ import time
 
 import numpy as np
 from sklearn.metrics import mean_squared_error
+from statsmodels.discrete.discrete_model import Probit
 import copy
 sys.path.append(os.path.abspath('../'))
 sys.path.append(os.path.abspath('../data/'))
@@ -30,15 +31,27 @@ class INR:
         self.p = X.shape[1]
         self.M = Y.shape[1]
         # beta initialization
-        self.beta_initial = np.random.rand(self.p, 1)  # np.ones((p, 1))
-        self.beta_hat = copy.copy(self.beta_initial)
+        self.beta_initial = None
+        self.beta_hat = None
+        self.initialize_beta()
+        # self.beta_initial = np.random.rand(self.p, 1)  # np.ones((p, 1))
+        # self.beta_hat = copy.copy(self.beta_initial)
         # sigma initialization
         self.sigma_initial = np.ones(self.M)  # np.random.rand(self.M)
         self.sigma_initial[0] = 1
         self.sigma_hat = copy.copy(self.sigma_initial)
-        print(f"Initialization:")
-        print(f"\tbeta: {self.beta_hat.reshape(-1)}")
-        print(f"\tsigma: {self.sigma_hat}")
+        print(f"================= INR Algorithm =================")
+
+    def initialize_beta(self):
+        A1 = self.A[:, 0]
+        Y1 = self.Y[A1 == 1, 0]
+        X1 = self.X[A1 == 1, :]
+        model = Probit(Y1, X1)
+        probit_model = model.fit(disp=0)
+        # print(probit_model.summary())
+        beta_hat = probit_model.params.reshape(-1, 1)
+        self.beta_initial = beta_hat
+        self.beta_hat = copy.copy(beta_hat)
 
     def update_beta(self):
         U = np.dot(self.X, self.beta_hat) / self.sigma_hat
@@ -62,7 +75,6 @@ class INR:
         # update beta
         new_beta_hat = self.beta_hat - tmp_hess_inv.dot(tmp_score).reshape(-1, 1)
         beta_mse = mean_squared_error(new_beta_hat, self.beta_hat)
-        print(f"beta mse: {beta_mse}")
         self.beta_hat = new_beta_hat
         return beta_mse
 
@@ -89,28 +101,39 @@ class INR:
         new_sigma_hat = self.sigma_hat - 1 / (tmp_1 + tmp_2) * tmp_3
         new_sigma_hat[0] = 1
         sigma_mse = mean_squared_error(self.sigma_hat[1:], new_sigma_hat[1:])
-        print(f"update_sigma")
-        print(f"\tsigma mse: {sigma_mse:.6f}")
         self.sigma_hat = new_sigma_hat
-        print(f"\tcurrent sigma_hat: {new_sigma_hat}")
         return sigma_mse
 
     def INR_algorithm(self, maxIter=100, epsilon=1e-3, mseWarn=50):
+        beta_mse = 0
+        sigma_mse = 0
         for i in range(maxIter):
+            print(f'----------------- Iteration {i} -----------------')
+            # 由于开始的时候beta估计的比较准，因此让sigma自己多迭代几次
+            for k in range(5):
+                sigma_mse = self.update_sigma()
+                print(f"update_sigma: sigma mse({sigma_mse:.4f})")
+                print(f"sigma_hat: {self.sigma_hat}")
+                mse = beta_mse + sigma_mse
+                if mse < epsilon:  # the change of this and last step is small enough to stop the INR algorithm
+                    print(f"Success with mean square change: {mse:.4f}")
+                    return mse
+                if np.any(self.sigma_hat < 0) or sigma_mse > mseWarn or \
+                        (np.abs(self.sigma_hat - self.sigma_initial) < epsilon).sum() > 0:
+                    self.reinitialize_sigma(epsilon)
             beta_mse = self.update_beta()
-            print(f"INR_algorithm\n\tbeta_hat: {self.beta_hat.reshape(-1)}")
-            sigma_mse = self.update_sigma()
+            print(f"update_beta: beta mse({beta_mse:.4f})")
+            print(f"beta_hat: {self.beta_hat.reshape(-1)}")
             mse = beta_mse + sigma_mse
             if mse < epsilon:  # the change of this and last step is small enough to stop the INR algorithm
-                print(f"Success with mean square change: {mse:.6f}")
+                print(f"Success with mean square change: {mse:.4f}")
                 return mse
-            if np.any(self.sigma_hat < 0) or sigma_mse > mseWarn or np.min(np.abs(self.sigma_hat - self.sigma_initial)) < epsilon:
-                self.reinitialize_sigma(epsilon)
 
-        print(f"Warning: reach the maxIter({maxIter}) with MSE: {mse:.6f}")
+        print(f"Warning: reach the maxIter({maxIter}) with MSE: {mse:.4f}")
         return mse
 
     def reinitialize_sigma(self, epsilon=1e-3):
+        print(f'++++++++++++ reinitialize_sigma +++++++++++++++')
         print("reinitialize_sigma:")
         # seldom changed index
         seldom_change_index = np.abs(self.sigma_hat - self.sigma_initial) < epsilon
@@ -132,12 +155,15 @@ class INR:
             self.sigma_initial[fast_change_index] = self.sigma_initial[fast_change_index] / 2
             self.sigma_hat[fast_change_index] = self.sigma_initial[fast_change_index]
             print(f"\tfast change index")
+        self.sigma_hat[0] = 1
+        print(f"sigma_hat: {self.sigma_hat}")
+        print(f'+++++++++++++++++++++++++++++++++++++++++++++++')
 
 
 if __name__ == '__main__':
     N = 1000000
     p = 20
-    M = 50
+    M = 100
     seed = 0
     np.random.seed(seed)  # set random seed
     np.set_printoptions(precision=3)  # 设置小数位置为3位
@@ -146,7 +172,7 @@ if __name__ == '__main__':
     sigma_star = np.ones(M)
     # sigma_star[1:] *= np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
     sigma_star[1:int(M / 2)] *= 0.2
-    sigma_star[int(M / 2):] *= 8
+    sigma_star[int(M / 2):] *= 5
     print(f"true sigma: {sigma_star}")
     X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=0)  # generate synthetic dataset
     alpha_list = [0.1] * M
@@ -161,16 +187,8 @@ if __name__ == '__main__':
     print("------------- beta --------------")
     print(f"true beta: {beta_star}")
     print(f"estimate beta: {inr.beta_hat.reshape(-1)}")
-    print(f"final MSE: {mean_squared_error(beta_star, inr.beta_hat):.6f}")
+    print(f"final MSE: {mean_squared_error(beta_star, inr.beta_hat):.4f}")
     print("------------- sigma -------------")
     print(f"true sigma: {sigma_star}")
     print(f"estimate sigma: {inr.sigma_hat}")
-    print(f"final MSE: {mean_squared_error(sigma_star, inr.sigma_hat):.6f}")
-
-
-
-
-
-
-
-
+    print(f"final MSE: {mean_squared_error(sigma_star, inr.sigma_hat):.4f}")
