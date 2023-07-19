@@ -30,7 +30,9 @@ Human-Machine Annotation"*.
   > 	【原因】beta的初始值很好，先固定beta更新sigma，可以让sigma迭代到一个较好的值时再更新beta
   > 3. INR每一步迭代，更新sigma时更新好几次（我这里选择的5次），再更新一次beta
   	【原因】观察发现，更新一次sigma时sigma的值仍然不太好，此时更新beta会让beta变差，于是最终的结果变得很差
-
+- `0719`: INR存在异常值，bug主要有两个：
+  1. $\widehat sigma_m$ 在迭代中出现了负数，解决办法：使用调整初始值的方式重新初始化负数的 $\widehat sigma_m$
+  2. 之前写的基于随机初始化 $\widehat sigma_m$ 的代码中有一个seldomly changed case，排查发现由于此时初始值给的很好，所以经常是seldomly change case，因此删去此部分代码
 
 ## Codes
 

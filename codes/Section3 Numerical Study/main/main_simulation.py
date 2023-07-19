@@ -22,9 +22,8 @@ sys.path.append(os.path.abspath('../data/'))
 sys.path.append(os.path.abspath('../model/'))
 from synthetic_dataset import *  # codes to generate a synthetic dataset
 from synthetic_annotators import *
-from OS import *
+# from OS import *
 from INR import *
-
 
 
 def get_hyper_parameter(hyper_parameters, name):
@@ -33,6 +32,7 @@ def get_hyper_parameter(hyper_parameters, name):
 
 
 def map_func(params):
+    np.set_printoptions(precision=3)
     # get hyper parameters
     path = "../Hyper_Parameters.xlsx"
     hyper_parameters = pd.read_excel(path)
@@ -51,11 +51,11 @@ def map_func(params):
     # parameter of interest + synthetic dataset
     np.random.seed(seed)  # set random seed
     beta_star = np.ones(p)  # the true parameter of interest
-    X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=0)  # generate synthetic dataset
+    X, Y_true = construct_synthetic_dataset(N, p, beta_star, seed=rep)  # generate synthetic dataset
 
     # generate synthetic annotators
     sigma_star = np.ones(M)
-    sigma_star[1:int(M/2)] *= 0.2  # np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
+    sigma_star[1:int(M / 2)] *= 0.2  # np.arange(start=0.1, stop=10.1, step=(10 / M))[:(-1)]
     sigma_star[int(M / 2):M] *= 5
 
     # first-round sample selection
@@ -66,8 +66,8 @@ def map_func(params):
 
     # One-Step Algorithm
     t1 = time.time()
-    os = OS(X1, Y1_annotation, A1_annotation)
-    os.OS_algorithm()
+    os = INR(X1, Y1_annotation, A1_annotation)
+    _, os_iter = os.INR_algorithm(maxIter=1, mseWarn=1, epsilon=1e-6)
     t2 = time.time()
     os_time = t2 - t1
     os_beta_mse = mean_squared_error(beta_star, os.beta_hat)
@@ -76,13 +76,16 @@ def map_func(params):
     # INR Algorithm
     t3 = time.time()
     inr = INR(X1, Y1_annotation, A1_annotation)
-    inr.INR_algorithm(maxIter=50)
+    _, inr_iter = inr.INR_algorithm(maxIter=20, mseWarn=1, epsilon=1e-6)
     t4 = time.time()
     inr_time = t4 - t3
     inr_beta_mse = mean_squared_error(beta_star, inr.beta_hat)
     inr_sigma_mse = mean_squared_error(sigma_star, inr.sigma_hat)
 
-    results = [alpha, subset_ratio, rep, os_time, os_beta_mse, os_sigma_mse, inr_time, inr_beta_mse, inr_sigma_mse]
+    results = [alpha, subset_ratio, rep,
+               os_time, os_iter, os_beta_mse, os_sigma_mse,
+               inr_time, inr_iter, inr_beta_mse, inr_sigma_mse]
+
     print(f"Record Results from Process with alpha({alpha}), subset({subset_ratio}), and repetition({rep})")
     with open(f'./results/simulation-alpha({alpha})-subset({subset_ratio}).csv',
             'a') as f:
@@ -94,6 +97,7 @@ def map_func(params):
 
 
 if __name__ == "__main__":
+    np.set_printoptions(precision=5)
     # get hyper parameters
     path = "../Hyper_Parameters.xlsx"
     hyper_parameters = pd.read_excel(path)
@@ -103,7 +107,8 @@ if __name__ == "__main__":
     repetition = get_hyper_parameter(hyper_parameters, "repetition")  # the repetition times
     subset_ratio = get_hyper_parameter(hyper_parameters, "subset_ratio")
     subset_ratio_list = [float(item) for item in subset_ratio.split()]
-    # subset_ratio_list = [0.05]
+    # subset_ratio_list = [0.1]
+    # repetition = 100
 
     for alpha in alphas:
         for subset_ratio in subset_ratio_list:
@@ -113,8 +118,9 @@ if __name__ == "__main__":
                     'a') as f:
                 csv_write = csv.writer(f)
                 csv_write.writerow(
-                    ['alpha', 'subset_ratio', 'repetition', 'os_time', 'os_beta_mse', 'os_sigma_mse', 'inr_time',
-                     'inr_beta_mse', 'inr_sigma_mse'])
+                    ['alpha', 'subset_ratio', 'repetition',
+                     'os_time', 'os_iter', 'os_beta_mse', 'os_sigma_mse',
+                     'inr_time', 'inr_iter', 'inr_beta_mse', 'inr_sigma_mse'])
 
     # multi-processing
     NUM_THREADS = 4
@@ -126,9 +132,9 @@ if __name__ == "__main__":
     NUM_PROCESS = NUM_CPU // NUM_THREADS
     print(f'最大并行进程数: {NUM_PROCESS}')
     # parameter dic for multi-processing
-    # param_list = [[i, j, 100] for i in alphas for j in subset_ratio_list]
+    # param_list = [[i, j, 58] for i in alphas for j in subset_ratio_list]
     param_list = [[i, j, k] for i in alphas for j in subset_ratio_list for k in range(repetition)]
 
     # multiprocessing
     with mp.Pool(NUM_PROCESS) as pool:
-        pool.map(map_func, param_list)
+        results = pool.map(map_func, param_list)

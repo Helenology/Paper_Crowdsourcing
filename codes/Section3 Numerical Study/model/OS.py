@@ -121,7 +121,6 @@ class OS:
         print(f"update_beta: beta mse({beta_mse:.4f})")
 
 
-
 if __name__ == '__main__':
     N = 1000000
     p = 20
