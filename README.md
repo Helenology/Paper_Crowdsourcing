@@ -36,6 +36,8 @@ Human-Machine Annotation"*.
 
 ## Codes
 
+Required packages: `statsmodels` `openpyxl`
+
 All the relevant codes and the corresponding graphs are listed in [codes](./codes/). A tree of the belongings are as follows
 
 ```
