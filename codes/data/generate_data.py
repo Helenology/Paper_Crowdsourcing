@@ -17,13 +17,13 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     np.random.seed(seed=seed)
 
     # parameters - beta
-    beta = np.random.randn(K+1, p) * 10
+    beta = np.random.randn(K+1, p)
     beta[0] = 0
     beta_norm = norm(beta)
     beta = beta / beta_norm
 
     # features - X
-    X = np.random.randn(N, p)  # (sub)-gaussian features
+    X = np.random.randn(N, p) * 2  # (sub)-gaussian features
     X[:, 0] = 1                # set the first columns of X to be constants
 
     # true labels - Y
@@ -34,7 +34,7 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     X1, X2, Y1, Y2 = train_test_split(X, Y, test_size=(N-n)/N, random_state=seed)
 
     # annotator sigma
-    sigma_list = np.arange(0.1, 10.1, 10/M)  # sigma_list = np.ones(M) * 5
+    sigma_list = np.arange(0.1, 3.1, 3/M)
 
     # parameter vector
     theta = np.zeros(K * p + M)
@@ -60,6 +60,6 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
             Y_im = np.argmax(np.random.multinomial(1, prob_im, 1))
             AY1[i, m] = Y_im
     AY1[A1 == 0] = -1
-    print(AY1[0:2])
+    # print(AY1[0:2])
 
     return beta, sigma_list, theta, X, Y, X1, X2, Y1, Y2, A1, AY1

@@ -22,8 +22,8 @@ class Initial:
         self.X = X
         self.Y = Y
         self.A = A
-        self.initial_b = np.zeros((self.M, self.K, self.p))
-        self.initial_beta = np.zeros((self.K, self.p))
+        self.initial_b = np.zeros((self.M, self.K+1, self.p))
+        self.initial_beta = np.zeros((self.K+1, self.p))
         self.initial_sigma = np.zeros(self.M)
 
     def opt_alg(self):
@@ -34,8 +34,8 @@ class Initial:
             y_m = y_m[idx]
             clf = LogisticRegression(random_state=0, fit_intercept=False).fit(X_m, y_m)
             self.initial_b[m] = clf.coef_
+            self.initial_b[m] -= self.initial_b[m, 0]
             self.initial_sigma[m] = 1 / norm(self.initial_b[m])
             self.initial_beta += self.initial_b[m] * self.initial_sigma[m] / self.M
-
 
 
