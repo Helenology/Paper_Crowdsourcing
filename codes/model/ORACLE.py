@@ -1,170 +1,149 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time    : 2024/2/19 18:12
+# @Time    : 2024/6/19 11:42
 # @Author  : Helenology
 # @Site    : 
-# @File    : MLE.py
+# @File    : ORACLE.py
 # @Software: PyCharm
 
+from model.BaseModel import BaseModel
 import numpy as np
 from numpy.linalg import norm
-import copy
-from scipy.optimize import minimize
 
 
-class ORACLE:
-    def __init__(self, X, Y, A, K, initial_beta, sigma):
-        self.n = X.shape[0]
-        self.p = X.shape[1]
-        self.M = Y.shape[1]
-        self.K = K
-        # data preparation
-        self.X = X
-        self.XXT = self.compute_XXT()
-        self.Y = Y
-        self.Y_onehot = self.compute_Y_onehot()  # (n, K, M)
-        self.A = A
+class ORACLE(BaseModel):
+    def __init__(self, X, Y, A, K, beta, sigma):
+        BaseModel.__init__(self, X, Y, A, K)
         # parameter initialization
-        self.beta = initial_beta
-        self.sigma = sigma
+        self.beta = beta    # initial estimator for beta
+        self.sigma = sigma  # true parameter sigma
         # optimization initialization
         self.gradient = None
         self.Hessian = None
         self.steps = 0
-        self.likelihood_list = [-np.Inf]
+        self.update = 0
 
-    def compute_likelihood(self):
-        p_ikm = np.zeros((self.n, (self.K+1), self.M))  # (n, (K+1), M)
-        p_ikm[:, 1:] = self.compute_pikm()
-        p_ikm[:, 0] = 1 - p_ikm[:, 1:].sum(axis=1)      #
-        p_ikm += 1e-10
-        p_ikm /= p_ikm.sum(axis=1, keepdims=True)
-        Y_onehot = np.ones((self.n, (self.K+1), self.M))
-        for k in range(self.K):
-            Y_onehot[:, k, :] = (self.Y == k).astype(int)
-        likelihood = self.A.reshape(self.n, 1, self.M) * Y_onehot * np.log(p_ikm)
-        likelihood = likelihood.sum() / self.n
-        return likelihood
-
-    def compute_XXT(self):
-        """Conpute $X_i X_i^\top$ for $1 \leq i \leq n$"""
-        XXT = (self.X.reshape(self.n, self.p, 1)) * (self.X.reshape(self.n, 1, self.p))
-        return XXT
-
-    def compute_Y_onehot(self):
-        Y_onehot = np.ones((self.n, self.K, self.M))                      # here we neglect class 0
-        Y_onehot *= self.Y.reshape(self.n, 1, self.M)
-        for k in range(self.K):
-            Y_onehot[:, k, :] = (Y_onehot[:, k, :] == (k+1)).astype(int)  # here we neglect class 0
-        return Y_onehot
-
-    def compute_pikm(self):
-        value_ik = self.X.dot(np.transpose(self.beta)).reshape(self.n, self.K, 1)
-        value_ikm = value_ik / self.sigma
-        value_ikm = np.exp(value_ikm)
-        value_sum = value_ikm.sum(axis=1, keepdims=True) + 1  # Here +1 is because class 0
-        p_ikm = value_ikm / value_sum
-        return p_ikm
-
-    # def GA_alg(self, max_steps=100, epsilon=1e-5, eta=0.01, lbd=0.01):
-    #     """Gradient ascending"""
-    #     while True:
-    #         self.steps += 1
-    #         likelihood = self.compute_likelihood()
-    #         self.likelihood_list.append(likelihood)
-    #         # gradient
-    #         self.gradient = self.derivative_calcu(order=1) / self.n
-    #         # penalty for $\|B^\top B\| = 1$
-    #         penalty = np.zeros_like(self.gradient)
-    #         penalty[0:(self.p * self.K)] = -(lbd * 2) * self.beta.ravel()
-    #         # update theta
-    #         self.theta = self.theta + eta * self.gradient + penalty  # Maximum it because MLE
-    #         self.beta, self.sigma = self.copy_beta_sigma()
-    #         # calculate difference
-    #         theta_diff = norm(eta * self.gradient + penalty)
-    #         # print(f"[step {self.steps}] with likelihood: {likelihood:.6f}; theta diff: {theta_diff: .6f}")
-    #         if (theta_diff < epsilon) or (self.steps > max_steps) or \
-    #                 np.isnan(theta_diff) or (likelihood < self.likelihood_list[-2]):
-    #             break
-    #     self.beta, self.sigma = self.copy_beta_sigma()
-
-    def NR_alg(self, max_steps=10, epsilon=1e-5, lbd=0.1):
-        while True:
-            self.steps += 1
-            likelihood = self.compute_likelihood()
-            self.likelihood_list.append(likelihood)
-            # gradient
-            self.gradient, self.Hessian = self.derivative_calcu(order=2)
-            self.gradient /= self.n
-            self.Hessian /= self.n
-            # update beta
-            beta_diff = - np.linalg.inv(self.Hessian) @ self.gradient
-            beta_new = self.beta.ravel() + beta_diff
-            self.beta = beta_new.reshape(self.K, self.p)
-            diff_norm = norm(beta_diff)
-            print(f"[Step {self.steps}] beta difference norm:{diff_norm:.5f}")
-
-            # terminal condition
-            if (diff_norm < epsilon) or (self.steps > max_steps) \
-                    or (np.isnan(diff_norm)) or (likelihood < self.likelihood_list[-2]):
-                break
-        return self.beta.ravel()
-
-
-    def compute_A_diff(self):
-        self.p_ikm = self.compute_pikm()       # (n, K, M)
-        diff = self.Y_onehot - self.p_ikm      # (n, K, M)
-        A = self.A.reshape(self.n, 1, self.M)  # (n, 1, M)
-        A_diff = A * diff                      # (n, K, M)
-        return A_diff                          # (n, K, M)
-
-    def derivative_calcu(self, order=1):
+    def derivative_calcu(self, tmp_beta, tmp_sigma):
+        """
+        Reconstruct of the function from BaseModel without gradient of sigma.
+        :param tmp_beta:
+        :param tmp_sigma:
+        :return:
+        """
+        K = self.K
+        M = self.M
+        n = self.n
+        p = self.p
         ##################################### 1st derivative #####################################
         # partial beta
-        A_diff = self.compute_A_diff()
-        delta = A_diff / self.sigma.reshape(1, 1, self.M)  # (n, K, M)
-        delta = delta.sum(axis=2)  # (n, K)
-        partial_beta = np.transpose(delta) @ self.X  # (K, n) @ (n, p) = (K, p)
-
-        # gradient
-        gradient = partial_beta.ravel()
-        if order == 1:
-            return gradient
+        p_ikm = self.compute_pikm(tmp_beta, tmp_sigma)  # (n, K, M)
+        A_diff = self.compute_A_diff(p_ikm)
+        delta = A_diff / tmp_sigma.reshape(1, 1, M)     # (n, K, M)
+        delta = delta.sum(axis=2)                       # (n, K)
+        partial_beta = np.transpose(delta) @ self.X     # (K, n) @ (n, p) = (K, p)
+        partial_beta = partial_beta.ravel()
 
         ##################################### 2st derivative #####################################
-        A11 = np.zeros((self.K * self.p, self.K * self.p))  # partial beta^2: (pK, pK)
-        for j in range(self.K):
-            for k in range(self.K):
-                App = int(j == k) * (self.p_ikm[:, j, :]) - self.p_ikm[:, j, :] * self.p_ikm[:, k, :]  # (n, M)
-                App = self.A * App                                                   # (n, M)
-                Sigma_jk = -App / (self.sigma.reshape((1, self.M))**2)               # (n, M)
-                Sigma_jk = Sigma_jk.reshape((self.n, self.M, 1, 1))                  # (n, M, 1, 1)
-                Sigma_jk = Sigma_jk * self.XXT.reshape((self.n, 1, self.p, self.p))  # (n, M, p, p)
+        A11 = np.zeros((K * p, K * p))                                                         # (pK, pK)
+        for j in range(K):
+            for k in range(K):
+                App = int(j == k) * (p_ikm[:, j, :]) - p_ikm[:, j, :] * p_ikm[:, k, :]         # (n, M)
+                App = self.A * App                                                             # (n, M)
+                Sigma_jk = -App / (tmp_sigma.reshape(1, M) ** 2)                               # (n, M)
+                Sigma_jk = Sigma_jk.reshape((n, M, 1, 1))                                      # (n, M, 1, 1)
+                Sigma_jk = Sigma_jk * self.XXT.reshape((n, 1, p, p))                           # (n, M, p, p)
                 # A11
-                A11[(j * self.p):((j+1) * self.p), (k * self.p):((k+1) * self.p)] = Sigma_jk.sum(axis=(0, 1))  # (p, p)
+                A11[(j * p):((j + 1) * p), (k * p):((k + 1) * p)] = Sigma_jk.sum(axis=(0, 1))  # (p, p)
 
-        matrix = np.zeros((self.K * self.p + self.M, self.K * self.p + self.M))
-        matrix[:(self.K * self.p), :(self.K * self.p)] = A11
-        return gradient, A11
+        return partial_beta, A11
 
+    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None):
+        while True:
+            self.steps += 1
+            print(f"######## [Step {self.steps}] ########")
+            # gradient & Hessian
+            self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+            self.gradient = -self.gradient / self.n
+            self.Hessian = -self.Hessian / self.n
+            # update beta
+            beta_diff = -np.linalg.inv(self.Hessian) @ self.gradient
+            self.beta = self.beta + beta_diff.reshape(self.K, self.p)
+            print(f"norm(gradient): {norm(self.gradient):.7f}")
+            if true_beta is not None:
+                print(f"RMSE(beta): {norm(self.beta.ravel() - true_beta.ravel()):.7f}")
+            # terminal condition
+            if (norm(self.gradient) < tol) or (self.steps >= max_steps) or (norm(beta_diff) < tol):
+                break
+        return self.beta.ravel() / norm(self.beta)
 
-if __name__ == "__main__":
-    n = 100
-    p = 10
-    M = 5
-    K = 2
-    X = np.ones((n, p))
-    Y = np.ones((n, M)) * 2
-    Y[0] = -1
-    A = np.ones((n, M))
-    A[0] = 0
+    # def NR_alg(self, max_steps=10, tol=1e-5, sig=0.01, lbd=0.001, rho=2, true_beta=None):
+    #     self.update = 1
+    #     while self.update < max_steps:
+    #         print(f"######## [Update {self.update}] ########")
+    #         self.steps = 0
+    #         self.gradient = np.Inf
+    #         beta_diff = np.Inf
+    #         while (norm(self.gradient) > tol) and (self.steps < max_steps) and (norm(beta_diff) > tol):
+    #             print(f"######## [Update {self.update}'s Step {self.steps}] ########")
+    #             # gradient & Hessian
+    #             self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+    #             self.gradient = -self.gradient / self.n
+    #             self.Hessian = -self.Hessian / self.n
+    #             # penalty for $\|B^\top B\| = 1$
+    #             pen_grad = (lbd + sig * (norm(self.beta) ** 2 - 1)) * self.beta.ravel()
+    #             pen_hess = np.zeros_like(self.Hessian)
+    #             for j in range(self.K * self.p):
+    #                 for k in range(self.K * self.p):
+    #                     if j == k:
+    #                         pen_hess[j, k] = lbd + sig * (norm(self.beta) ** 2 - 1 + 2 * (self.beta.ravel()[j]) ** 2)
+    #                     else:
+    #                         pen_hess[j, k] = 2 * sig * (self.beta.ravel()[j]) * (self.beta.ravel()[k])
+    #             # update theta
+    #             beta_diff = -np.linalg.inv(self.Hessian + pen_hess) @ (self.gradient + pen_grad)
+    #             self.beta = self.beta + beta_diff.reshape(self.K, self.p)
+    #             print(f"norm(gradient): {norm(self.gradient):.7f}")
+    #             if true_beta is not None:
+    #                 print(f"RMSE(beta): {norm(self.beta.ravel() - true_beta.ravel()):.7f}")
+    #             self.steps += 1
+    #         eq_violance = (norm(self.beta) ** 2 - 1) * 0.5
+    #         if eq_violance <= tol:
+    #             break
+    #         # update lambda (Lagrangian Multiplier)
+    #         lbd = lbd + sig * eq_violance
+    #         sig = sig * rho
+    #         self.update += 1
+    #
+    #     return self.beta.ravel() / norm(self.beta)
 
-    mle_model = MLE(X, Y, A, K)
-    # mle_model.first_derivative_calcu()
-    # mle_model.second_derivative_calcu()
-    likelihood = mle_model.compute_likelihood()
+    def check(self, true_beta, true_sigma):
+        """check under alpha=1"""
+        K = self.K
+        M = self.M
+        n = self.n
+        p = self.p
+        ORA_beta = self.beta.ravel()
+        true_beta = true_beta.reshape(K, p)
+        true_sigma = true_sigma.reshape(M)
+        diff_mom = ORA_beta.ravel() - true_beta.ravel()
 
-
-
-
+        diff_son = 0
+        p_ikm = self.compute_pikm(true_beta, true_sigma)  # (n, K, M)
+        A_diff = self.compute_A_diff(p_ikm)               # (n, K, M)
+        L1 = A_diff / true_sigma.reshape(1, 1, M)         # (n, K, M)
+        L1 = L1.sum(axis=2)                               # (n, K)
+        L1 = np.transpose(L1) @ self.X                    # (K, n) @ (n, p) -> (K, p)
+        L1 = L1.reshape(K * p, 1)                         # (K * p, 1)
+        L2 = 0
+        for m in range(M):
+            Sigma_m = np.zeros((K * p, K * p))                                                        # (pK, pK)
+            for j in range(K):
+                for k in range(K):
+                    App = int(j == k) * (p_ikm[:, j, m]) - p_ikm[:, j, m] * p_ikm[:, k, m]            # (n, )
+                    App = (self.A[:, m] * App).reshape((n, 1, 1))                                     # (n, 1, 1)
+                    Sigma_jk = App * self.XXT                                                         # (n, p, p)
+                    Sigma_m[(j * p):((j + 1) * p), (k * p):((k + 1) * p)] = Sigma_jk.sum(axis=0)      # (p, p)
+            Sigma_m /= (true_sigma[m] ** 2)
+            L2 += Sigma_m
+        diff_son = np.linalg.inv(L2) @ L1
+        return diff_mom, diff_son
 
