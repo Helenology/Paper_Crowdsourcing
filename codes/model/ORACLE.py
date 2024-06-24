@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/6/19 11:42
 # @Author  : Helenology
-# @Site    :
+# @Site    : 
 # @File    : ORACLE.py
 # @Software: PyCharm
 
@@ -23,7 +23,7 @@ class ORACLE(BaseModel):
         self.steps = 0
         self.update = 0
 
-    def compute_derivative(self, tmp_beta, tmp_sigma):
+    def derivative_calcu(self, tmp_beta, tmp_sigma):
         """
         Reconstruct of the function from BaseModel without gradient of sigma.
         :param tmp_beta:
@@ -57,12 +57,12 @@ class ORACLE(BaseModel):
 
         return partial_beta, A11
 
-    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None, true_sigma=None):
+    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None):
         while True:
             self.steps += 1
             print(f"######## [Step {self.steps}] ########")
             # gradient & Hessian
-            self.gradient, self.Hessian = self.compute_derivative(self.beta, self.sigma)
+            self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
             self.gradient = -self.gradient / self.n
             self.Hessian = -self.Hessian / self.n
             # update beta
@@ -74,8 +74,7 @@ class ORACLE(BaseModel):
             # terminal condition
             if (norm(self.gradient) < tol) or (self.steps >= max_steps) or (norm(beta_diff) < tol):
                 break
-        self.beta /= norm(self.beta)
-        return self.beta.ravel()
+        return self.beta.ravel() / norm(self.beta)
 
     # def NR_alg(self, max_steps=10, tol=1e-5, sig=0.01, lbd=0.001, rho=2, true_beta=None):
     #     self.update = 1
