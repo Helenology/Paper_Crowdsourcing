@@ -34,7 +34,9 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     X1, X2, Y1, Y2 = train_test_split(X, Y, test_size=(N-n)/N, random_state=seed)
 
     # annotator sigma
-    sigma_list = np.arange(0.1, 3.1, 3/M)
+    sigma_list = np.arange(0.1, 4.1, 4/M)
+#     sigma_list = np.ones(M) * 2 #np.arange(0.1, 5.1, 5/M)
+#     sigma_list[0:int(M/2)] = 0.1
 
     # parameter vector
     theta = np.zeros(K * p + M)

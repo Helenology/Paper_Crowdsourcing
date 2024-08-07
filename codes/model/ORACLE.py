@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/6/19 11:42
 # @Author  : Helenology
-# @Site    : 
+# @Site    :
 # @File    : ORACLE.py
 # @Software: PyCharm
 
@@ -57,7 +57,7 @@ class ORACLE(BaseModel):
 
         return partial_beta, A11
 
-    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None):
+    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None, true_sigma=None):
         while True:
             self.steps += 1
             print(f"######## [Step {self.steps}] ########")
@@ -74,7 +74,8 @@ class ORACLE(BaseModel):
             # terminal condition
             if (norm(self.gradient) < tol) or (self.steps >= max_steps) or (norm(beta_diff) < tol):
                 break
-        return self.beta.ravel() / norm(self.beta)
+        self.beta /= norm(self.beta)
+        return self.beta.ravel()
 
     # def NR_alg(self, max_steps=10, tol=1e-5, sig=0.01, lbd=0.001, rho=2, true_beta=None):
     #     self.update = 1
