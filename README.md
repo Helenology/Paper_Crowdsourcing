@@ -1,6 +1,6 @@
 # Crowdsourcing
 
-Relevant codes and some illustrations for the working paper *"A Statistical Framework for Hybrid
-Human-Machine Annotation"*.
+Relevant codes and some illustrations for the working paper *"Consolidation of Multiple Noisy Crowd Labels with Statistical Guarantees
+"*.
 
 ## A Brief Taste
