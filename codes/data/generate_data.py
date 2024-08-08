@@ -14,17 +14,6 @@ from sklearn.model_selection import train_test_split
 
 
 def generate_data(K, p, N, n, M, alpha, seed=0):
-    """
-
-    :param K: (K+1) is the number of classes
-    :param p: dimension of features
-    :param N: the number of instances
-    :param n: the number of pilot samples
-    :param M: the number of crowd annotators
-    :param alpha: assignment probability; (1,) => equal probability; (M,) => individual-wise probability
-    :param seed: random seed
-    :return:
-    """
     np.random.seed(seed=seed)
 
     # parameters - beta
@@ -35,7 +24,7 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
 
     # features - X
     X = np.random.randn(N, p) * 2  # (sub)-gaussian features
-    # X[:, 0] = 1                  # set the first columns of X to be constants
+    X[:, 0] = 1                # set the first columns of X to be constants
 
     # true labels - Y
     Y = np.argmax(X.dot(np.transpose(beta)), axis=1)
@@ -52,28 +41,27 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     # parameter vector
     theta = np.zeros(K * p + M)
     theta[:(p*K)] = beta[1:].ravel()
-    theta[(p*K):] = sigma.reshape(-1)
+    theta[(p*K):] = sigma_list.reshape(-1)
 
     # annotation task assignment - A1
     A1 = np.random.binomial(1, alpha, size=(n, M))
 
     # annotation probability - AP1
-    AP1 = X1.dot(np.transpose(beta))          # (n, K+1)
-    AP1 = AP1.reshape(AP1.shape + (1,))       # (n, K+1, 1)
-    AP1 = AP1 / sigma                         # (n, K+1, M)
-    AP1 = np.exp(AP1)                         # (n, K+1, M)
-    AP1_sum = AP1.sum(axis=1, keepdims=True)  # (n, 1, M)
-    AP1 = AP1 / AP1_sum                       # (n, K+1, M)
+    AP1 = X1.dot(np.transpose(beta))
+    AP1 = AP1.reshape(AP1.shape + (1,))
+    AP1 = AP1 / sigma_list
+    AP1 = np.exp(AP1)
+    AP1_sum = AP1.sum(axis=1, keepdims=True)
+    AP1 = AP1 / AP1_sum
 
     # annotation - AY1
     AY1 = np.zeros((n, M))
     for i in range(n):
         for m in range(M):
-            if A1[i, m] == 0:                 # The ith instance is [not assigned] to the mth crowd annotator.
-                AY1[i, m] = -1
-            else:                             # The ith instance is [assigned] to the mth crowd annotator.
-                prob_im = AP1[i, :, m]
-                Y_im = np.argmax(np.random.multinomial(1, prob_im, 1))
-                AY1[i, m] = Y_im
+            prob_im = AP1[i, :, m]
+            Y_im = np.argmax(np.random.multinomial(1, prob_im, 1))
+            AY1[i, m] = Y_im
+    AY1[A1 == 0] = -1
+    # print(AY1[0:2])
 
-    return beta, sigma, theta, X, Y, X1, X2, Y1, Y2, A1, AY1
+    return beta, sigma_list, theta, X, Y, X1, X2, Y1, Y2, A1, AY1
