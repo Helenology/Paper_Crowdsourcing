@@ -44,7 +44,7 @@ class MLE(BaseModel):
             while (norm(self.gradient) > tol) and (self.steps < max_steps) and (norm(beta_diff) > tol):
                 print(f"######## [Step {self.steps}] ########")
                 # gradient & Hessian
-                self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+                self.gradient, self.Hessian = self.compute_derivative(self.beta, self.sigma)
                 self.gradient = -self.gradient / self.n
                 self.Hessian = -self.Hessian / self.n
                 # penalty for $\|B^\top B\| = 1$

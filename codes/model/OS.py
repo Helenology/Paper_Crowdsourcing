@@ -35,7 +35,7 @@ class OS(BaseModel):
             self.steps += 1
             print(f"######## [Step {self.steps}] ########")
             # gradient & Hessian
-            self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+            self.gradient, self.Hessian = self.compute_derivative(self.beta, self.sigma)
             self.gradient = -self.gradient / self.n
             self.Hessian = -self.Hessian / self.n
             # update theta = (beta, sigma)
@@ -64,7 +64,7 @@ class OS(BaseModel):
     #         while (norm(self.gradient) > tol) and (self.steps < max_steps) and (norm(beta_diff) > tol):
     #             print(f"######## [Step {self.steps}] ########")
     #             # gradient & Hessian
-    #             self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+    #             self.gradient, self.Hessian = self.compute_derivative(self.beta, self.sigma)
     #             self.gradient = -self.gradient / self.n
     #             self.Hessian = -self.Hessian / self.n
     #             # penalty for $\|B^\top B\| = 1$
@@ -106,7 +106,7 @@ class OS(BaseModel):
         # OS_sigma = self.sigma.reshape(M, 1)
         true_beta = true_beta.reshape(K, p)
         true_sigma = true_sigma.reshape(M, 1)
-        init_grad, init_Hess = self.derivative_calcu(initial_beta, initial_sigma)
+        init_grad, init_Hess = self.compute_derivative(initial_beta, initial_sigma)
         init_A11 = init_Hess[0:(K * p), 0:(K * p)] / (n * M)
         diff_mom = np.sqrt(n * M) * init_A11 @ (OS_beta - true_beta).reshape((K * p), 1)
 

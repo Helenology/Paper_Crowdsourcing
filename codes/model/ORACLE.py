@@ -23,7 +23,7 @@ class ORACLE(BaseModel):
         self.steps = 0
         self.update = 0
 
-    def derivative_calcu(self, tmp_beta, tmp_sigma):
+    def compute_derivative(self, tmp_beta, tmp_sigma):
         """
         Reconstruct of the function from BaseModel without gradient of sigma.
         :param tmp_beta:
@@ -62,7 +62,7 @@ class ORACLE(BaseModel):
             self.steps += 1
             print(f"######## [Step {self.steps}] ########")
             # gradient & Hessian
-            self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
+            self.gradient, self.Hessian = self.compute_derivative(self.beta, self.sigma)
             self.gradient = -self.gradient / self.n
             self.Hessian = -self.Hessian / self.n
             # update beta
