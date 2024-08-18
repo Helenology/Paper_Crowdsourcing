@@ -3,31 +3,39 @@
 # @Time    : 2024/6/19 11:42
 # @Author  : Helenology
 # @Site    : 
-# @File    : ORACLE.py
+# @File    : ORACLE_beta.py
 # @Software: PyCharm
 
 from model.BaseModel import BaseModel
 import numpy as np
 from numpy.linalg import norm
+from copy import copy
 
 
-class ORACLE(BaseModel):
-    def __init__(self, X, Y, A, K, beta, sigma):
+class ORACLE_beta(BaseModel):
+    def __init__(self, X, Y, A, K, beta, true_sigma):
+        """
+        Initialization.
+        :param X: features (n, p)
+        :param Y: crowd labels (n, M)
+        :param A: instance assignment with 1 => assigned; 0 => not assigned (n, M)
+        :param K: (K+1) is the total number of classes
+        :param beta: an estimator for beta
+        :param true_sigma: true values of sigma
+        """
         BaseModel.__init__(self, X, Y, A, K)
         # parameter initialization
-        self.beta = beta    # initial estimator for beta
-        self.sigma = sigma  # true parameter sigma
+        self.beta = copy(beta)         # an estimator for beta
+        self.sigma = copy(true_sigma)  # true values of sigma
         # optimization initialization
-        self.gradient = None
-        self.Hessian = None
         self.steps = 0
         self.update = 0
 
     def derivative_calcu(self, tmp_beta, tmp_sigma):
         """
-        Reconstruct of the function from BaseModel without gradient of sigma.
-        :param tmp_beta:
-        :param tmp_sigma:
+        Reconstruct the function from BaseModel without gradient of sigma.
+        :param tmp_beta: calculate at this beta value
+        :param tmp_sigma: calculate at this sigma value
         :return:
         """
         K = self.K
@@ -42,7 +50,6 @@ class ORACLE(BaseModel):
         delta = delta.sum(axis=2)                       # (n, K)
         partial_beta = np.transpose(delta) @ self.X     # (K, n) @ (n, p) = (K, p)
         partial_beta = partial_beta.ravel()
-
         ##################################### 2st derivative #####################################
         A11 = np.zeros((K * p, K * p))                                                         # (pK, pK)
         for j in range(K):
@@ -54,13 +61,11 @@ class ORACLE(BaseModel):
                 Sigma_jk = Sigma_jk * self.XXT.reshape((n, 1, p, p))                           # (n, M, p, p)
                 # A11
                 A11[(j * p):((j + 1) * p), (k * p):((k + 1) * p)] = Sigma_jk.sum(axis=(0, 1))  # (p, p)
-
         return partial_beta, A11
 
-    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None):
+    def update_alg(self, max_steps=10, tol=1e-5, true_beta=None, echo=True):
         while True:
             self.steps += 1
-            print(f"######## [Step {self.steps}] ########")
             # gradient & Hessian
             self.gradient, self.Hessian = self.derivative_calcu(self.beta, self.sigma)
             self.gradient = -self.gradient / self.n
@@ -68,9 +73,11 @@ class ORACLE(BaseModel):
             # update beta
             beta_diff = -np.linalg.inv(self.Hessian) @ self.gradient
             self.beta = self.beta + beta_diff.reshape(self.K, self.p)
-            print(f"norm(gradient): {norm(self.gradient):.7f}")
-            if true_beta is not None:
-                print(f"RMSE(beta): {norm(self.beta.ravel() - true_beta.ravel()):.7f}")
+            if echo:
+                print(f"######## [Step {self.steps}] ########")
+                print(f"norm(gradient): {norm(self.gradient):.7f}")
+                if true_beta is not None:
+                    print(f"RMSE(beta): {norm(self.beta.ravel() - true_beta.ravel()):.7f}")
             # terminal condition
             if (norm(self.gradient) < tol) or (self.steps >= max_steps) or (norm(beta_diff) < tol):
                 break
