@@ -42,11 +42,12 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     print("True Labels", pd.value_counts(Y), "\n")
 
     # pilot sample - X1 and Y1
-    X1, X2, Y1, Y2 = train_test_split(X, Y, test_size=(N-n)/N, random_state=seed)
+    ids = np.arange(N)
+    X1, X2, Y1, Y2, pilot_ids, rest_ids = train_test_split(X, Y, ids, test_size=(N-n)/N, random_state=seed)
 
     # annotator sigma
     # sigma = np.arange(0.1, 4.1, 4/M)
-    sigma = np.ones(M) * 2 #np.arange(0.1, 5.1, 5/M)
+    sigma = np.ones(M) * 2
     sigma[0:int(M/2)] = 0.5
 
     # parameter vector
@@ -69,12 +70,12 @@ def generate_data(K, p, N, n, M, alpha, seed=0):
     AY1 = np.zeros((n, M))
     for i in range(n):
         for m in range(M):
-            if A1[i, m] == 0:                 # The ith instance is [not assigned] to the mth crowd annotator.
+            if A1[i, m] == 0:                 # The ith instance is [Not Assigned] to the mth crowd annotator.
                 AY1[i, m] = -1
-            else:                             # The ith instance is [assigned] to the mth crowd annotator.
+            else:                             # The ith instance is [Assigned] to the mth crowd annotator.
                 prob_im = AP1[i, :, m]
                 Y_im = np.argmax(np.random.multinomial(1, prob_im, 1))
                 AY1[i, m] = Y_im
     AY1[A1 == 0] = -1
 
-    return beta, sigma, theta, X, Y, X1, X2, Y1, Y2, A1, AY1
+    return beta, sigma, theta, X, Y, X1, X2, Y1, Y2, A1, AY1, pilot_ids, rest_ids

@@ -13,7 +13,7 @@ import copy
 
 
 class BaseModel:
-    def __init__(self, X, Y, A, K):
+    def __init__(self, X, Y, A, K, alpha=1):
         """
         Initialization.
         :param X: features (n, p)
@@ -25,12 +25,21 @@ class BaseModel:
         self.p = X.shape[1]  # feature dimension
         self.M = Y.shape[1]  # the number of crowd annotators
         self.K = K
+        self.alpha = alpha   # assignment prob
         # data preparation
         self.X = X                               # features (n, p)
         self.XXT = (self.X.reshape(self.n, self.p, 1)) * (self.X.reshape(self.n, 1, self.p))  # X X^T (n, p, p)
         self.Y = Y                               # crowd labels (n, M)
         self.Y_onehot = self.compute_Y_onehot()  # crowd labels in one-hot form (n, K, M)
         self.A = A                               # binary assignment indicator (n, M)
+
+    def compute_D(self, tmp_beta):
+        K = self.K
+        p = self.p
+        tmp_beta = tmp_beta.reshape((p * K, 1))
+        I_pK = np.identity(K * p)
+        D = I_pK - tmp_beta @ np.transpose(tmp_beta)
+        return D
 
     def compute_Y_onehot(self):
         Y_onehot = np.ones((self.n, self.K, self.M))
@@ -85,7 +94,7 @@ class BaseModel:
         partial_beta = np.transpose(delta) @ self.X     # (K, n) @ (n, p) = (K, p)
 
         # partial sigma
-        partial_sigma = -A_diff / tmp_sigma.reshape(1, 1, M) ** 2              # (n, K, M)
+        partial_sigma = - A_diff / tmp_sigma.reshape(1, 1, M) ** 2             # (n, K, M)
         partial_sigma *= (self.X @ np.transpose(tmp_beta)).reshape((n, K, 1))  # (n, K, M)
         partial_sigma = partial_sigma.sum(axis=(0, 1))                         # (M,)
 
@@ -96,7 +105,7 @@ class BaseModel:
             for k in range(K):
                 App = int(j == k) * (p_ikm[:, j, :]) - p_ikm[:, j, :] * p_ikm[:, k, :]  # (n, M)
                 App = self.A * App                                    # (n, M)
-                Sigma_jk = -App / (tmp_sigma.reshape(1, M) ** 2)      # (n, M)
+                Sigma_jk = - App / (tmp_sigma.reshape(1, M) ** 2)     # (n, M)
                 Sigma_jk = Sigma_jk.reshape((n, M, 1, 1))             # (n, M, 1, 1)
                 Sigma_jk = Sigma_jk * self.XXT.reshape((n, 1, p, p))  # (n, M, p, p)
                 # A11
