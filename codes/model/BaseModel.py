@@ -58,8 +58,8 @@ class BaseModel:
         M = self.M
         value_ik = (self.X @ np.transpose(tmp_beta)).reshape(self.n, self.K, 1)  # (n, K, 1)
         value_ikm = value_ik / tmp_sigma.reshape(1, 1, M)                        # (n, K, M)
-        value_ikm[value_ikm > 100] = 100                                         # prevent Inf
-        value_ikm[value_ikm < -100] = -100                                       # prevent -Inf
+        value_ikm[value_ikm > 100] = 100
+        value_ikm[value_ikm < -100] = -100
         value_ikm = np.exp(value_ikm)                                            # (n, K, M)
         value_sum = value_ikm.sum(axis=1, keepdims=True) + 1                     # (n, M); +1 is due to class 0
         p_ikm = value_ikm / value_sum                                            # (n, K, M)

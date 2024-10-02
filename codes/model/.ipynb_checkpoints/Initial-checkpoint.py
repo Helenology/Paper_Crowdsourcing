@@ -26,7 +26,7 @@ class Initial(BaseModel):
                 idx = (self.A[:, m] != 0)
                 X_m = self.X[idx]
                 y_m = y_m[idx]
-                clf = LogisticRegression(random_state=0, fit_intercept=False).fit(X_m, y_m)
+                clf = LogisticRegression(random_state=0, fit_intercept=False, max_iter=5000).fit(X_m, y_m)
                 initial_b[m] = clf.coef_         # Initial Estimator: $\widetilde B_m$ but with class 0
                 initial_b[m] -= initial_b[m, 0]  # get rid of class 0's coefficient
                 initial_sigma[m] = 1 / norm(initial_b[m])
