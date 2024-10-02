@@ -1,20 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time    : 2024/6/18 20:47
+# @Time    : 2024/8/26 21:01
 # @Author  : Helenology
 # @Site    : 
-# @File    : Initial.py
+# @File    : HIML.py
 # @Software: PyCharm
 
-from model.BaseModel import BaseModel
 import numpy as np
-from sklearn.linear_model import LogisticRegression
 from numpy.linalg import norm
+from copy import copy
+from model.BaseModel import BaseModel
+from model.Initial import Initial
+from model.MS import MS
+from utils import *
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
 
 
-class Initial(BaseModel):
-    def __init__(self, X, Y, A, K):
-        BaseModel.__init__(self, X, Y, A, K)
+class HIML(MS):
+    def __init__(self, X, Y, A, K, alpha=1):
+        MS.__init__(self, X, Y, A, K, alpha, beta=None, sigma=None)
+        # initial parameters
+        self.beta, self.sigma, _ = self.init_param()
 
     def init_param(self):
         if self.K > 1:  # Multi-Logistic Regression with classes (K+1) > 2
@@ -51,31 +58,24 @@ class Initial(BaseModel):
             initial_beta /= norm(initial_beta)                            # re-scale to 1
             return initial_beta, initial_sigma, initial_b
 
-    def check(self, init_beta, init_sigma, true_beta, true_sigma):
-        """check under alpha=1"""
-        K = self.K
-        M = self.M
-        n = self.n
-        p = self.p
-        true_beta = true_beta.reshape(K, p)
-        true_sigma = true_sigma.reshape(M)
-        diff_mom = (init_beta - true_beta).ravel()
+    def fit(self):
+        # TS Model
+        beta, sigma = self.update_alg(max_steps=2)
+        self.beta = beta
+        self.sigma = sigma
+        self.beta_hat = np.zeros((self.K + 1, self.p))
+        self.beta_hat[1:] = beta.reshape(self.K, self.p)
+        self.sigma_hat = copy(self.sigma)
 
-        diff_son = 0
-        Dstar = np.identity(K * p) - true_beta.reshape(K * p, 1) @ true_beta.reshape(1, K * p)
-        p_ikm = self.compute_pikm(true_beta, true_sigma)  # (n, K, M)
-        A_diff = self.compute_A_diff(p_ikm)               # (n, K, M)
-        for m in range(M):
-            Sigma_m = np.zeros((K * p, K * p))                                                        # (pK, pK)
-            for j in range(K):
-                for k in range(K):
-                    App = int(j == k) * (p_ikm[:, j, m]) - p_ikm[:, j, m] * p_ikm[:, k, m]            # (n, )
-                    App = (self.A[:, m] * App).reshape((n, 1, 1))                                     # (n, 1, 1)
-                    Sigma_jk = App * self.XXT                                                         # (n, p, p)
-                    Sigma_m[(j * p):((j + 1) * p), (k * p):((k + 1) * p)] = Sigma_jk.sum(axis=0) / n  # (p, p)
-            invSigma_m = np.linalg.inv(Sigma_m)
-            mL_m = np.transpose(A_diff[:, :, m]) @ self.X  # (K, n) @ (n, p) = (K, p)
-            mL_m = mL_m.reshape(K * p, 1)
-            diff_son += 1 / (n * M) * true_sigma[m] * Dstar @ invSigma_m @ mL_m
+        # Check Crowd Annotator Quality
+        if (sigma < 0).sum() > 0:
+            print(f"Crowd Annatator Error: there are spammers! Return their indexes!")
+            return np.where(sigma < 0)[0]
 
-        return diff_mom, diff_son
+    def predict_with_MaxMis(self, X):
+        Y_hat = np.argmax(X.dot(np.transpose(self.beta_hat)), axis=1)
+        alpha_n = np.mean(self.alpha)
+        Avar = self.compute_Avar()
+        MaxMis = [compute_MaxMix_i(X[i], self.beta_hat, Avar, self.n, self.M, alpha_n, self.K, self.p) for i in range(X.shape[0])]
+        MaxMis = np.array(MaxMis)
+        return Y_hat, MaxMis
